@@ -1,0 +1,43 @@
+ProxMon - Automating Web Application Penetration Tests
+(c) 2006, 2007 iSEC Partners (http://www.isecpartners.com)
+Author: Jonathan Wilkins <jwilkins[at]isecpartners[dot]com>
+Portions adapted from code written by:
+Jesse Burns  <jesse[at]isecpartners[dot]com>
+David Thiel <david[at]isecpartners[dot]com>
+Tim Newsham <newsham[at]isecpartners[dot]com>
+-------------------------------------
+WARNING: Some checks will actually connect to target hosts and perform
+actions such as attempting to upload files.  These are off by default,
+use -o to enable.
+
+About:
+------
+ProxMon monitors proxies for security relevant events and helps
+to automate web application penetration tests.
+
+If you run ProxMon with no options, it will attempt to run in monitor
+mode on the most recently created WebScarab temporary directory.
+
+Usage:
+------
+ProxMon should be run while you're testing a web application using WebScarab.
+ProxMon will examine all transaction logs and report security relevant
+events as they happen.
+
+It can also be run after the fact on WebScarab save directories.
+
+ProxMon can check for values that appear over SSL and then go cleartext.  
+Values that are sent as both a cookie on the query string  and (hopefully) 
+anything else that's tedious about web app pentests.
+
+Full information is available in proxmon.pdf
+
+Requirements:
+-------------
+- Python 2.4 or better (http://www.python.org)
+- config (http://www.red-dove.com/python_config.html)
+- pycurl (http://pycurl.sourceforge.net)
+- OpenSSL (http://www.openssl.org)
+- pyOpenSSL (http://pyopenssl.sourceforge.net/)
+- BeautifulSoup (http://www.crummy.com/software/BeautifulSoup/)
+

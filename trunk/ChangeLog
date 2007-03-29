@@ -1,0 +1,24 @@
+Version 1.0.18 (20070329):
+	- Added -x which allows extraction of transaction responses (mainly for auditing
+	  JavaScript code, but since it strips gzip/deflate encoding it's useful in
+	  other contexts)
+Version 1.0.17 (20070320):
+	- Added -P for a pause at the end of the run and set -P in the shortcut created
+	  by the installer
+	- Slightly smarter tmp dir detection
+	- Added to trivial_values
+	- Cleaned up excess output for id_framework_passive and js_warn
+Version 1.0.16 (20070312):
+	- Initial dsniff proxy
+	- Added base64 decrypt for http auth module
+Version 1.0.15 (20070310):
+	- Changed Makefile for tgz, now creates in a subdirectory named proxmon-version
+	- Fixed error when no sessions are available
+Version 1.0.14 (20070309):
+	- Fixed monitor mode issue with webscarab.py trying to process incomplete 
+	  transactions (thanks David)
+	- Minor layout changes to whitepaper
+	- Edits to README (credits and requirements)
+Version 1.0.13 (20070308):
+	- Initial limited beta
+	- Friends and family release
