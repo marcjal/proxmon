@@ -74,6 +74,7 @@ class webscarab(pmproxy):
 	def get(self, session, tinfo):
 		t = {}
 		t['id'] = tinfo['id']
+		t['source'] = self.proxy_name
 		t['request'] = open(opjoin(session['id'], 'conversations', 
 							tinfo['id']+'-request'),'rb').read()
 		t['response'] = open(opjoin(session['id'], 'conversations',

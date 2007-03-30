@@ -7,7 +7,7 @@ Various utility functions used by both proxmon and modules
 import os, re, sys
 
 trivial_values = ['', 'False', 'True', 'true', 'false', 
-					'en-us', 'en-US', 'en_US', 'en',
+					'en-us', 'en-US', 'en_US', 'en', 'us',
 					'utf-8', 'UTF-8', 'firefox-a', '32-bit', '420', '1.5', 
 					'640x480', '800x600', '1024x768', '1400x1050', '1600x1200',
 					'640', '768', '800', '1024', '1050', '1200', '1400', '1600',

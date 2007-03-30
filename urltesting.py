@@ -25,12 +25,16 @@ def get_curl():
 	return (curl, output)
 
 def url_exists(url):
+	not_found = ['not found on this server', 'file not found']
 	(c, b) = get_curl()
 	c.setopt(pycurl.URL, url)
 	try: c.perform()
 	except: return False
 	if 199 < c.getinfo(c.HTTP_CODE) < 300:
 		# XXX - check it's not really a 404 by scanning body
+		for x in not_found:
+			if re.search(x, b.getvalue(), re.IGNORECASE):
+				return False
 		return True
 
 def file_contains(url, string):
@@ -98,6 +102,7 @@ if __name__ == '__main__':
 #		'http://www.isecpartners.com/', 'https://www.isecpartners.com/',
 #		'https://www.isecpartners.com/picts/', 'http://www.google.com/',
 #		'http://www.cnn.com', 'http://hdf.ncsa.uiuc.edu/HDF5/doc/PSandPDF/',
+		'http://www.google.com/nl/intl/_vti_bin',
 		'http://www.umich.edu/~archive/mac/']
 
 	print "Directory Listing Test"
@@ -106,3 +111,6 @@ if __name__ == '__main__':
 	print "HTTP PUT test"
 	for url in ['http://scratch.bitland.net/put/', 'http://scratch.bitland.net/']:
 		print '\t' + url + ' returned ' + str(allows_upload(url))
+	print "Url exists"
+	for url in t:
+		print '\t' + url + ' returned ' + str(url_exists(url))
