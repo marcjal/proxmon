@@ -10,6 +10,22 @@ from pmutil import *
 
 Verbosity = 1
 
+def chk_fmt(s):
+	if not s: return False
+	r = re.search(r'([^\n]+)([^\n]*)(.*)', s, re.DOTALL|re.MULTILINE)
+	if r:
+		first = re.match(r'[^\n]+', s).group()
+		parts = re.split(r'\s', first, 3)
+		if len(parts) < 2:
+			return False
+		if parts[0].upper() in ['HTTP/0.9', 'HTTP/1.0', 'HTTP/1.1']:
+			# response
+			return True
+		if len(parts) > 2 and parts[2].upper() in ['HTTP/0.9', 'HTTP/1.0', 'HTTP/1.1']:
+			# request
+			return True
+	return False
+
 # Line parsing routines
 def get_sentcookies(l, t, pmd):
 	m = re.match("^Cookie:\s*(.+)$", l, re.IGNORECASE) # regex due to case
@@ -72,9 +88,9 @@ def get_hostname(s):
 
 	@param s: String containing an URL"""
 	si = s.find("//") + 2
-	if si == -1: return None
 	ei = s[si:].find(":")
-	if ei == -1: return None
+	if si == -1 or ei == -1:
+		return None
 	return s[si:ei+si]
 
 def get_domain(s):
@@ -85,7 +101,9 @@ def get_domain(s):
 	if len(hns) == 1:
 		return hns[0]
 	tld = hns[len(hns)-1]
-	if tld in ['com', 'net', 'org', 'info', 'biz']: # XXX - add more and get from config file
+	if tld in ['com', 'net', 'org', 'info', 'biz', 'aero', 'cat', 'coop', 'jobs',
+				'mobi', 'museum', 'name', 'pro', 'tel', 'travel', 'gov', 'mil',
+				'edu', 'int']:
 		return hns[len(hns)-2]+"."+hns[len(hns)-1]
 	else:
 		return hns[len(hns)-3]+"."+hns[len(hns)-2]+"."+hns[len(hns)-1]
@@ -168,6 +186,7 @@ def parserequest(data, checks, t, pmd, urlfilter):
 		if not data: return False
 		reqbody = None
 		if Verbosity > 1: print "[d] parserequest: Trying " + t['id']
+		t['rawreq'] = data
 		req = StringIO.StringIO(data)
 		# Handle request line
 		l = req.readline()
@@ -198,8 +217,7 @@ def parserequest(data, checks, t, pmd, urlfilter):
 			if m: 
 				t['host'] = m.group(1).strip()
 				if not t['port']: t['port'] = '80'
-				if 'hostname' not in t:
-					get_hostname(t['host'])
+				t['hostname'] = t['host']
 				if 'server' not in t:
 					t['server'] = t['hostname'] + ':' + t['port']
 				if 'domain' not in t:
@@ -250,6 +268,8 @@ def parseresponse(data, checks, t, pmd, urlfilter):
 		chunked = False
 		resp = StringIO.StringIO(data)
 
+		t['rawresp'] = data
+
 		# Status line
 		l = resp.readline()
 		sl = parserespline(l)
@@ -285,7 +305,12 @@ def parseresponse(data, checks, t, pmd, urlfilter):
 			if not len(s): raise IOError
 			if 'respcontentlen' in t:
 				if len(s) != t['respcontentlen']:
-					print "[x] parseresponse: Content-Length doesn't match data read"
+					return False
+					#print "[x] parseresponse: Content-Length doesn't match data read"
+					#print '\tLen Expected (from header cl): %s' % t['respcontentlen']
+					#print '\tLen Read: %s' % len(s)
+					#print '\tT: %s' % t
+					#pdb.set_trace()
 					# XXX: should give a hard error?
 		if deflated: 
 			# XXX - Tested, need to clean up entry in test suite
@@ -323,4 +348,51 @@ def parseresponse(data, checks, t, pmd, urlfilter):
 
 	return True
 
+if __name__ == '__main__':
+	req1 = '''GET http://www.isecpartners.com:80/?foobar=secret1 HTTP/1.1
+Host: www.isecpartners.com
+User-Agent: Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.1) Gecko/20061204 Firefox/2.0.0.1
+Accept: text/xml,application/xml,application/xhtml+xml,text/html;q=0.9,text/plain;q=0.8,image/png,*/*;q=0.5
+Accept-Language: en-us,en;q=0.5
+Accept-Encoding: gzip,deflate
+Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7
+Keep-Alive: 300
+Proxy-Connection: keep-alive
 
+'''
+
+	req2 = '''GET / HTTP/1.0
+
+'''
+
+	req3 = None
+	req4 = ''
+	req5 = 'GET /'
+
+	resp1 = '''HTTP/1.1 403 Forbidden
+Date: Thu, 29 Mar 2007 20:43:51 GMT
+Server: Apache
+Connection: close
+Content-Type: text/html; charset=iso-8859-1
+
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<HTML><HEAD>
+<TITLE>403 Forbidden</TITLE>
+</HEAD><BODY>
+<H1>Forbidden</H1>
+You don't have permission to access /
+on this server.<P>
+</BODY></HTML>'''
+
+
+	resp2 = '''HTTP/1.0 200 OK
+
+asdf'''
+
+	print chk_fmt(req1)
+	print chk_fmt(req2)
+	print chk_fmt(req3)
+	print chk_fmt(req4)
+	print chk_fmt(req5)
+	print chk_fmt(resp1)
+	print chk_fmt(resp2)

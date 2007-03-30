@@ -46,16 +46,17 @@ from pmdata import *
 from pmproxy import *
 from transaction import *
 
-try:
-	import debug # Newsh's debug library
-except ImportError:
-	pass
+#try:
+#	import debug # Newsh's debug library
+#except ImportError:
+#	pass
 
 Verbosity = 0
 TIDs = None
 Count = 0
 ProxCJ = None
 Extract = False
+
 FNTrans = list(string.maketrans('', ''))
 okfnchars = string.digits + string.ascii_letters + '._&%()!-[]+='
 for x in xrange(256):
@@ -83,6 +84,7 @@ def parsetrans(t, checks, pmd, urlfilter):
 		if t['id'] not in TIDs: return None
 
 	tinfo = {'id': t['id']}
+	if not (chk_fmt(t['request'])and chk_fmt(t['response'])): return False
 	if parserequest(t['request'], checks, tinfo, pmd, urlfilter):
 		if parseresponse(t['response'], checks, tinfo, pmd, urlfilter):
 			pmd.add_transactions(tinfo)
@@ -106,12 +108,14 @@ def extract_trans(t):
 			print 'Error: ' + e.strerror
 
 	fn = t['file'].rsplit('.', 1)
+	if len(fn[0]) > 30:
+		fn[0] = fn[0][:30]
 	outfn = opjoin(pdir, t['dir'][1:], fn[0].translate(FNTrans))
-	if t['qsf']: outfn += '_qs_' + t['qsf']
 	outfn += '.'+ str(t['id'])
 	if len(fn) > 1:
-		outfn += '.' + fn[1]
-	# XXX: this needs to normalize special chars
+		if len(fn[1]) > 10:
+			fn[1] = fn[1][:10]
+		outfn += '.' + fn[1].translate(FNTrans)
 	#print 'extract_trans: writing to '+ outfn
 	f = open(outfn, 'wb')
 	f.write(t['respbody'])

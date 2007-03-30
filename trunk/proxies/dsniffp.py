@@ -15,8 +15,10 @@ except ImportError:
 
 if not loaderror and sys.platform != 'cygwin':
 	class saver(http.HttpParser):
-		serverdata = None
-		clientdata = None
+		def __init__(self, flow):
+			super(saver, self).__init__(self)
+			self.flow = flow
+			self.data = ''
 
 	class pmdsniffh(dsniff.Handler):
 		def setup(self):
@@ -26,44 +28,24 @@ if not loaderror and sys.platform != 'cygwin':
 			self.subscribe('service', 'http', self.recv_flow)
 
 		def recv_flow(self, f):
-			#print 'pmdsniffh.recv_flow'
 			if f.state == dsniff.FLOW_START:
-				f.save['http'] = saver(f)
+				f.client.save = saver(f)
+				f.server.save = saver(f)
 			elif f.state == dsniff.FLOW_CLIENT_DATA:
-				f.save['http'].feed(f.client.data)
-				if f.save['http'].clientdata:
-					f.save['http'].clientdata += f.client.data
-				else:
-					f.save['http'].clientdata = f.client.data[:]
-				r = re.search(r'([^\n]+)([^\n]*)(.*)', f.client.data) # XXX: improve
-				if r:
-					m = r.group(1).split(' ')
-					if m[0] in http.HttpParser.methods:
-						print "Client Request:"
-						print r.group(1)
-						print r.group(2)
-				#print f.save['http'].clientdata
+				f.client.save.data += f.client.data
+				#print f.client.save.data
 			elif f.state == dsniff.FLOW_SERVER_DATA:
-				f.save['http'].feed(f.server.data)
-				if f.save['http'].serverdata:
-					f.save['http'].serverdata += f.server.data
-				else:
-					f.save['http'].serverdata = f.server.data[:]
-				# XXX: figure out if it's complete and add to transactions
-				t = {}
-				t['id'] = self.curid
-				self.curid += 1
-				t['request'] = f.save['http'].clientdata
-				t['response'] = f.save['http'].serverdata
-				self.transactions.append(t)
-				#print f.save['http'].serverdata
-				r = re.search(r'([^\n]+)([^\n]*)(.*)', f.server.data) # XXX: improve
-				if r:
-					if r.group(1).startswith('HTTP'):
-						print "Server Response:"
-						print r.group(1)
-						print r.group(2)
-			#elif f.state == dsniff.FLOW_END:
+				f.server.save.data += f.server.data
+				#print f.server.save.data
+
+				if chk_fmt(f.server.save.data) and chk_fmt(f.client.save.data):
+					t = {}
+					t['id'] = self.curid
+					t['source'] = 'dsniffp'
+					self.curid += 1
+					t['request'] = f.client.save.data
+					t['response'] = f.server.save.data
+					self.transactions.append(t)
 
 	class pmdsniff(pmproxy):
 		"Fake dsniff as a proxy"
@@ -77,8 +59,8 @@ if not loaderror and sys.platform != 'cygwin':
 				os.putenv('EVENT_NOPOLL', '1')
 
 			dsniff.config['pcap'] = {}
-			#dsniff.config['pcap']['interfaces'] = ['eth3']  # eth3 = bridge
-			dsniff.config['pcap']['interfaces'] = ['eth1'] # eth1 = ethernet
+			dsniff.config['pcap']['interfaces'] = ['eth3']  # eth3 = bridge
+			#dsniff.config['pcap']['interfaces'] = ['eth1'] # eth1 = ethernet
 
 			if not self.subclasses:
 				subclasses = dsniff.find_subclasses(dsniff.Handler, __import__('dsniffp'))
@@ -128,7 +110,7 @@ if not loaderror and sys.platform != 'cygwin':
 				for t in self.handler.transactions:
 					if t['id'] not in session['seentids']:
 						if not (t['request'] or t['response']): continue
-						print t
+						#print t
 						session['seentids'].append(t['id'])
 						session['transactions'].append(t)
 						return t

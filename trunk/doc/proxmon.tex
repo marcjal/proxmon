@@ -202,9 +202,10 @@ Here's an example of what you can expect to see when running the tool:
 Some checks are based on a single transaction and some are based on tracking more
 complicated global state.
 
-The http\_auth check will trigger any time it sees an Authorization header.
+The http\_auth check will trigger any time it sees an Authorization header.  It
+also decodes the header so that the username and password can be seen.
 \begin{lstlisting}[style=output]
-[*] Basic auth seen: Authorization: Basic andpbGtpbnM6YXNkZmFzZGY= (TIDs: 31, 32)
+[*] Basic auth seen: jwilkins:asdfasdf (TIDs: 31, 32)
 \end{lstlisting}
 
 The secure\_cookie\_sent\_clear check tracks all cookies that are set with the
@@ -236,7 +237,7 @@ Other checks results indicate a definite issue
 Some important command line parameters are:
 \begin{mindesc}
 \item[-o:] Perform active tests, which include actions like connecting to hosts
-\item[-d:] Specify a directory to search for sessions
+\item[-d:] Specify a datasource to search for sessions
 \item[-c:] Summarize cookie information
 \item[-q:] Summarize query string information
 \item[-v:] Include verbose information
@@ -276,8 +277,8 @@ is edit modules/bad\_directory.cfg and add the directory you want the tool to se
 
 The config file format is quite simple but flexible. 
 \footnote{ProxMon uses http://www.red-dove.com/python\_config.html by Vinay Sajip}
-If you want a simple string, just type it with no quotes.  Single quotes will ensure 
-proper escaping.  Anything after a \# is a comment.
+If you want a simple string, just type it with no quotes.  Single or double
+quotes will generally ensure proper escaping.  Anything after a \# is a comment.
 
 A more complicated example is the bad\_files check.  This check is run in online mode 
 and checks all detected directories for common problem files such as test scripts, 
@@ -324,7 +325,7 @@ full transaction has finished processing and all data is available.  To run like
 this, just declare a function called run()
 \lstinputlisting[style=code]{../modules/secure_cookies_sent_clear.py}
 
-Here the module is checking pmd (which is the ProxMon Datastore.  This is
+Here the module is checking pmd (which is the ProxMon Datastore).  This is
 updated constantly with information on values seen in the various transactions.
 
 The SetCookieSecureValues dictionary is keyed by value.  To find out if any
