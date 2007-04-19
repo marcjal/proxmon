@@ -28,7 +28,7 @@ Portions adapted from code written by:
 @organization: www.isecpartners.com
 @sort: main, scan, tail, parsetrans
 """
-__version__ = '1.0.18'
+__version__ = '1.0.19'
 __author__ = 'Jonathan Wilkins'
 __contact__ = 'jwilkins[at]isecpartners[dot]com'
 __copyright__ = '(c) 2006, 2007, Information Security Partners LLC.'

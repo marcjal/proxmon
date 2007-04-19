@@ -25,6 +25,7 @@ class webscarab(pmproxy):
 		if self._sessioncache: return self._sessioncache
 		sl = []
 		if not where: where = self.get_tmpdir()
+		if not where: return None
 		if not opexists(where): return None
 		if opexists(opjoin(where, 'conversations')):
 			return [self.session_info(where, '')]
