@@ -3,7 +3,29 @@
 """
 Datastore populated by proxy log parsers and consumed by modules
 """
+import md5, base64, sha
+
+def md5sum(data):
+	m = md5.new(data)
+	return m.digest()
+
+def sha1sum(data):
+	s = sha.new(data)
+	return s.digest()
+
 class pmdata(object):
+	def add(self, key, data, dest):
+		if key in dest: dest[key].append(data)
+		else: dest[key] = [data]
+		for f in [md5sum, sha1sum, base64.b64encode]:
+			if f(key) in dest:
+				dest[key].extend(dest[f(key)])
+		for f in [base64.b64decode]:
+			try:
+				if f(key) in dest:
+					dest[f(key)].extend(dest[key])
+			except: pass
+
 	def __init__(self):
 		self.Transactions = []
 
@@ -39,41 +61,18 @@ class pmdata(object):
 		nv['type'] = 'setcookie'
 		# XXX - do other cookie params
 
-		if c['value'] in self.SetCookieValues:
-			self.SetCookieValues[c['value']].append(nv)
-		else:
-			self.SetCookieValues[c['value']] = [nv]
-
-		if c['value'] in self.AllCookieValues:
-			self.AllCookieValues[c['value']].append(nv)
-		else:
-			self.AllCookieValues[c['value']] = [nv]
-
-		if c['value'] in self.AllValues:
-			self.AllValues[c['value']].append(nv)
-		else:
-			self.AllValues[c['value']] = [nv]
+		self.add(c['value'], nv, self.SetCookieValues)
+		self.add(c['value'], nv, self.AllCookieValues)
+		self.add(c['value'], nv, self.AllValues)
 
 		if c['httpparams']['proto'] == 'https':
-			if c['value'] in self.SetCookieSSLValues:
-				self.SetCookieSSLValues[c['value']].append(nv)
-			else:
-				self.SetCookieSSLValues[c['value']] = [nv]
-			if c['value'] in self.SecureValues:
-				self.SecureValues[c['value']].append(nv)
-			else:
-				self.SecureValues[c['value']] = [nv]
+			self.add(c['value'], nv, self.SetCookieSSLValues)
+			self.add(c['value'], nv, self.SecureValues)
 		else:
-			if c['value'] in self.ClearValues:
-				self.ClearValues[c['value']].append(nv)
-			else:
-				self.ClearValues[c['value']] = [nv]
+			self.add(c['value'], nv, self.ClearValues)
 
 		if 'secure' in c:
-			if c['value'] in self.SetCookieSecureValues:
-				self.SetCookieSecureValues[c['value']].append(nv)
-			else:
-				self.SetCookieSecureValues[c['value']] = [nv]
+			self.add(c['value'], nv, self.SetCookieSecureValues)
 
 	def add_sentcookie(self, c):
 		"""
@@ -87,32 +86,14 @@ class pmdata(object):
 		nv['httpparams'] = c['httpparams']
 		nv['type'] = 'sentcookie'
 
-		if c['value'] in self.SentCookieValues:
-			self.SentCookieValues[c['value']].append(nv)
-		else:
-			self.SentCookieValues[c['value']] = [nv]
-
-		if c['value'] in self.AllCookieValues:
-			self.AllCookieValues[c['value']].append(nv)
-		else:
-			self.AllCookieValues[c['value']] = [nv]
-
-		if c['value'] in self.AllValues:
-			self.AllValues[c['value']].append(nv)
-		else:
-			self.AllValues[c['value']] = [nv]
+		self.add(c['value'], nv, self.SentCookieValues)
+		self.add(c['value'], nv, self.AllCookieValues)
+		self.add(c['value'], nv, self.AllValues)
 
 		if c['httpparams']['proto'] == 'https':
-			if c['value'] in self.SecureValues:
-				self.SecureValues[c['value']].append(nv)
-			else:
-				self.SecureValues[c['value']] = [nv]
+			self.add(c['value'], nv, self.SecureValues)
 		else:
-			if c['value'] in self.ClearValues:
-				self.ClearValues[c['value']].append(nv)
-			else:
-				self.ClearValues[c['value']] = [nv]
-
+			self.add(c['value'], nv, self.ClearValues)
 
 	def add_querystring(self, qs):
 		# gets passed a single value
@@ -122,27 +103,13 @@ class pmdata(object):
 		nv['httpparams'] = qs['httpparams']
 		nv['type'] = 'qs'
 
-		if qs['value'] in self.QueryStringValues:
-			self.QueryStringValues[qs['value']].append(nv)
-		else:
-			self.QueryStringValues[qs['value']] = [nv]
-
-		if qs['value'] in self.AllValues:
-			self.AllValues[qs['value']].append(nv)
-		else:
-			self.AllValues[qs['value']] = [nv]
+		self.add(qs['value'], nv, self.QueryStringValues)
+		self.add(qs['value'], nv, self.AllValues)
 
 		if qs['httpparams']['proto'] == 'https':
-			if qs['value'] in self.SecureValues:
-				self.SecureValues[qs['value']].append(nv)
-			else:
-				self.SecureValues[qs['value']] = [nv]
+			self.add(qs['value'], nv, self.SecureValues)
 		else:
-			if qs['value'] in self.ClearValues:
-				self.ClearValues[qs['value']].append(nv)
-			else:
-				self.ClearValues[qs['value']] = [nv]
-
+			self.add(qs['value'], nv, self.ClearValues)
 
 	def add_postparam(self, pp):
 		# gets passed a single value
@@ -152,27 +119,12 @@ class pmdata(object):
 		nv['httpparams'] = pp['httpparams']
 		nv['type'] = 'post'
 
-		if pp['value'] in self.PostParamValues:
-			self.PostParamValues[pp['value']].append(nv)
-		else:
-			self.PostParamValues[pp['value']] = [nv]
-
-		if pp['value'] in self.AllValues:
-			self.AllValues[pp['value']].append(nv)
-		else:
-			self.AllValues[pp['value']] = [nv]
-
+		self.add(pp['value'], nv, self.PostParamValues)
+		self.add(pp['value'], nv, self.AllValues)
 		if pp['httpparams']['proto'] == 'https':
-			if pp['value'] in self.SecureValues:
-				self.SecureValues[pp['value']].append(nv)
-			else:
-				self.SecureValues[pp['value']] = [nv]
+			self.add(pp['value'], nv, self.SecureValues)
 		else:
-			if pp['value'] in self.ClearValues:
-				self.ClearValues[pp['value']].append(nv)
-			else:
-				self.ClearValues[pp['value']] = [nv]
-
+			self.add(pp['value'], nv, self.ClearValues)
 
 	def add_transactions(self, trans):
 		"""

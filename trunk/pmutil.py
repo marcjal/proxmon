@@ -5,6 +5,7 @@ Various utility functions used by both proxmon and modules
 """
 
 import os, re, sys
+import md5, base64
 
 trivial_values = ['', 'False', 'True', 'true', 'false', 
 					'en-us', 'en-US', 'en_US', 'en', 'us',
@@ -70,6 +71,14 @@ def parse_sent_cookies(header):
 			print "[x] parse_sent_cookie: cookie has >< 2 parts" 
 			return []
 	return cookielist
+
+def match_encoded_unfinished(v, targ):
+	for f in [md5.new, base64.b64encode, base64.b64decode]:
+		try: e = f(v)
+		except: pass
+		else:
+			if e in targ:
+				return True
 
 def implied_dirs(p):
 	"""
