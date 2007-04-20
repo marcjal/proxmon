@@ -19,11 +19,15 @@ class pmdata(object):
 		else: dest[key] = [data]
 		for f in [md5sum, sha1sum, base64.b64encode]:
 			if f(key) in dest:
-				dest[key].extend(dest[f(key)])
+				for k in dest[f(key)]:
+					if k not in dest[key]:
+						dest[key].extend(dest[f(key)])
 		for f in [base64.b64decode]:
 			try:
 				if f(key) in dest:
-					dest[f(key)].extend(dest[key])
+					for k in dest[key]:
+						if k not in dest[f(key)]:
+							dest[f(key)].extend(dest[key])
 			except: pass
 
 	def __init__(self):
