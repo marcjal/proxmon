@@ -3,7 +3,7 @@ from pmutil import *
 from BeautifulSoup import BeautifulSoup
 import pdb
 
-class nop(check):
+class insecure_password_entry(check):
 	"Finds password input fields on non-ssl pages"
 
 	def resp_body_parse(self, body, t):
