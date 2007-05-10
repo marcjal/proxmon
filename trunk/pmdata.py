@@ -17,18 +17,21 @@ class pmdata(object):
 	def add(self, key, data, dest):
 		if key in dest: dest[key].append(data)
 		else: dest[key] = [data]
-		for f in [md5sum, sha1sum, base64.b64encode]:
-			if f(key) in dest:
-				for k in dest[f(key)]:
-					if k not in dest[key]:
-						dest[key].extend(dest[f(key)])
-		for f in [base64.b64decode]:
-			try:
-				if f(key) in dest:
-					for k in dest[key]:
-						if k not in dest[f(key)]:
-							dest[f(key)].extend(dest[key])
-			except: pass
+		# XXX - Finish/fix this
+		#     - do a move instead?
+		#     - pointer records?
+		#for f in [md5sum, sha1sum, base64.b64encode]:
+		#	if f(key) in dest:
+		#		for k in dest[f(key)]:
+		#			if k not in dest[key]:
+		#				dest[key].extend(dest[f(key)])
+		#for f in [base64.b64decode]:
+		#	try:
+		#		if f(key) in dest:
+		#			for k in dest[key]:
+		#				if k not in dest[f(key)]:
+		#					dest[f(key)].extend(dest[key])
+		#	except: pass
 
 	def __init__(self):
 		self.Transactions = []
