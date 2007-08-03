@@ -57,7 +57,9 @@ class check(object):
 		Config file should have the same name as the python file, with
 		.cfg instead of .py
 		"""
-		cfgfilename = os.path.join('modules', self.__module__ + '.cfg')
+		basepath = os.path.dirname(os.path.abspath(sys.argv[0]))
+		cfgfilename = basepath + os.path.sep
+		cfgfilename += os.path.join('modules', self.__module__ + '.cfg')
 		if os.path.exists(cfgfilename):
 			try:
 				return config.Config(cfgfilename)

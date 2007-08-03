@@ -4,7 +4,7 @@ pdf: proxmon.pdf log/proxmon-o.txt
 
 proxmon.pdf: proxmon.tex proxmon.idx latex log/proxmon-o.txt
 	# The following is not a typo, latex needs to be run twice to handle all references
-	-pdflatex proxmon.tex
+	pdflatex proxmon.tex
 	pdflatex proxmon.tex
 
 proxmon.idx:

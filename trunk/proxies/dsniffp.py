@@ -53,14 +53,13 @@ if not loaderror and sys.platform != 'cygwin':
 		handler = None
 		subclasses = None
 
-		def __init__(self):
+		def __init__(self, iface):
 			if sys.platform in ('darwin', 'win32'):
 				os.putenv('EVENT_NOKQUEUE', '1')
 				os.putenv('EVENT_NOPOLL', '1')
 
 			dsniff.config['pcap'] = {}
-			dsniff.config['pcap']['interfaces'] = ['eth3']  # eth3 = bridge
-			#dsniff.config['pcap']['interfaces'] = ['eth1'] # eth1 = ethernet
+			dsniff.config['pcap']['interfaces'] = [iface]
 
 			if not self.subclasses:
 				subclasses = dsniff.find_subclasses(dsniff.Handler, __import__('dsniffp'))
