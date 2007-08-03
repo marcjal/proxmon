@@ -101,9 +101,9 @@ def get_domain(s):
 	if len(hns) == 1:
 		return hns[0]
 	tld = hns[len(hns)-1]
-	if tld in ['com', 'net', 'org', 'info', 'biz', 'aero', 'cat', 'coop', 'jobs',
-				'mobi', 'museum', 'name', 'pro', 'tel', 'travel', 'gov', 'mil',
-				'edu', 'int']:
+	if tld in ['com', 'net', 'org', 'info', 'biz', 'aero', 'cat', 'coop',
+				'jobs', 'mobi', 'museum', 'name', 'pro', 'tel', 'travel',
+				'gov', 'mil', 'edu', 'int']:
 		return hns[len(hns)-2]+"."+hns[len(hns)-1]
 	else:
 		return hns[len(hns)-3]+"."+hns[len(hns)-2]+"."+hns[len(hns)-1]

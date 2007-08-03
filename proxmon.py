@@ -34,8 +34,10 @@ __contact__ = 'jwilkins[at]isecpartners[dot]com'
 __copyright__ = '(c) 2006, 2007, Information Security Partners LLC.'
 __license__ = 'GPL'
 
-import os, re, sys, pdb, httplib, urllib, urllib2, cookielib, socket, time, string
+import os, re, sys, pdb, httplib, urllib, urllib2, cookielib
+import socket, time, string
 import cStringIO as StringIO
+import BeautifulSoup
 from optparse import OptionParser
 from time import sleep
 from os.path import exists as opexists
@@ -181,7 +183,7 @@ def tail(wproxy, session, checks, pmd, urlfilter):
 				c.run(pmd)
 				c.show_new()
 
-def load_proxies():
+def load_proxies(interface):
 	"""
 	Load all available proxy datasource handlers
 	"""
@@ -189,10 +191,11 @@ def load_proxies():
 	# XXX: figure out a better way
 	#if sys.platform == 'cygwin':
 	#	modpath = os.path.abspath(os.path.dirname(sys.argv[0])+os.sep+'proxies')
-	if sys.platform == 'win32':
-		modpath = os.path.join(r".\proxies") # XXX - hack
-	else:
-		modpath = './proxies/'
+	#if sys.platform == 'win32':
+	#	modpath = os.path.join(r".\proxies") # XXX - hack
+	#else:
+	#	modpath = './proxies/'
+	modpath = os.path.dirname(os.path.abspath(sys.argv[0]))+os.sep+'proxies'
 	sys.path.append(modpath)
 
 	modfiles = filter(lambda f: f.endswith('.py'), os.listdir(modpath))
@@ -211,7 +214,14 @@ def load_proxies():
 	for p in proxylist:
 		if p not in [pmproxy]:
 			print p.proxy_name,
-			proxies[p.__module__] = p()
+			try:
+				if p.proxy_name == 'dsniffp':
+					print "(interface %s)" % interface,
+					proxies[p.__module__] = p(interface)
+				else:
+					proxies[p.__module__] = p()
+			except:
+				print "\n[x] Error loading, (if dsniffp, check interface name)",
 	print
 
 	return proxies
@@ -233,6 +243,7 @@ def load_checks(loadreg, loadnet, loadpostrun, exclude=[]):
 		modpath = os.path.join(".\\modules") # XXX - hack
 	else:
 		modpath = './modules/'
+	modpath = os.path.dirname(os.path.abspath(sys.argv[0]))+os.sep+'modules'
 	sys.path.append(modpath)
 
 	modfiles = filter(lambda f: f.endswith('.py'), os.listdir(modpath))
@@ -383,6 +394,8 @@ def main(prog, *args):
 	optp.add_option('-f', '--filter', dest='filter', default='',
 			help='Filter transactions.  Only include transactions where the URL'
 			' contains the provided string')
+	optp.add_option('-i', '--interface', dest='interface', default='eth0',
+			help='Specify which interface pcap will listen on')
 	optp.add_option('-l', '--list', action='store_true', dest='list',
 			help='List available sessions')
 	optp.add_option('-o', '--online', action='store_true', dest='online', 
@@ -420,12 +433,11 @@ def main(prog, *args):
 	if opts.extract:
 		Extract = opts.extract
 
-	# XXX - Should I check package version stuff here?
-	# eg:
-	# if BeautifulSoup.__version__ < '3.0.3':
-	# 	print '[x] Old version of BeautifulSoup found, good luck ..'
+	# Check imported package versions
+	if BeautifulSoup.__version__ < '3.0.3':
+		print '[x] Old version of BeautifulSoup found, good luck ..'
 
-	proxies = load_proxies()
+	proxies = load_proxies(opts.interface)
 	ProxCJ = proxy_cookiejar()
 
 	try:
@@ -463,7 +475,8 @@ def main(prog, *args):
 	print '[*] %d checks loaded' % len(checks)
 
 	# Most netcheck modules just use these environment settings
-	if opts.proxy: os.environ['http_proxy'] = os.environ['https_proxy'] = opts.proxy
+	if opts.proxy:
+		os.environ['http_proxy'] = os.environ['https_proxy'] = opts.proxy
 
 	# Pass on configuration details to modules, XXX - needs improvement
 	for c in checks:
@@ -527,7 +540,8 @@ def main(prog, *args):
 	try:
 		pmd = pmdata()
 		if opts.datasource:
-			print '[*] Processing session %s in %s' % (opts.session['id'], opts.datasource)
+			print '[*] Processing session %s in %s' % (opts.session['id'], 
+														opts.datasource)
 		else:
 			print '[*] Processing session %s' % opts.session['id']
 
