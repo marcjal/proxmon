@@ -7,31 +7,26 @@ import md5, base64, sha
 
 def md5sum(data):
 	m = md5.new(data)
-	return m.digest()
+	return m.hexdigest()
 
 def sha1sum(data):
 	s = sha.new(data)
-	return s.digest()
+	return s.hexdigest()
 
 class pmdata(object):
 	def add(self, key, data, dest):
 		if key in dest: dest[key].append(data)
 		else: dest[key] = [data]
-		# XXX - Finish/fix this
-		#     - do a move instead?
-		#     - pointer records?
-		#for f in [md5sum, sha1sum, base64.b64encode]:
-		#	if f(key) in dest:
-		#		for k in dest[f(key)]:
-		#			if k not in dest[key]:
-		#				dest[key].extend(dest[f(key)])
-		#for f in [base64.b64decode]:
-		#	try:
-		#		if f(key) in dest:
-		#			for k in dest[key]:
-		#				if k not in dest[f(key)]:
-		#					dest[f(key)].extend(dest[key])
-		#	except: pass
+		for f in [md5sum, sha1sum, base64.b64encode]:
+			if f(key) in dest:
+				dest[key].extend(dest[f(key)])
+				del dest[f(key)]
+		for f in [base64.b64decode]:
+			try:
+				if f(key) in dest:
+					dest[f(key)].extend(dest[key])
+					del dest[key]
+			except: pass
 
 	def __init__(self):
 		self.Transactions = []
@@ -51,7 +46,7 @@ class pmdata(object):
 		self.PostParamValues = {}
 
 		self.ClearValues = {}
-		self.SecureValues = {} # XXX: rename to SSLValues?
+		self.SSLValues = {}
 		self.AllValues = {}
 
 	def add_setcookie(self, c):
@@ -74,7 +69,7 @@ class pmdata(object):
 
 		if c['httpparams']['proto'] == 'https':
 			self.add(c['value'], nv, self.SetCookieSSLValues)
-			self.add(c['value'], nv, self.SecureValues)
+			self.add(c['value'], nv, self.SSLValues)
 		else:
 			self.add(c['value'], nv, self.ClearValues)
 
@@ -98,7 +93,7 @@ class pmdata(object):
 		self.add(c['value'], nv, self.AllValues)
 
 		if c['httpparams']['proto'] == 'https':
-			self.add(c['value'], nv, self.SecureValues)
+			self.add(c['value'], nv, self.SSLValues)
 		else:
 			self.add(c['value'], nv, self.ClearValues)
 
@@ -114,7 +109,7 @@ class pmdata(object):
 		self.add(qs['value'], nv, self.AllValues)
 
 		if qs['httpparams']['proto'] == 'https':
-			self.add(qs['value'], nv, self.SecureValues)
+			self.add(qs['value'], nv, self.SSLValues)
 		else:
 			self.add(qs['value'], nv, self.ClearValues)
 
@@ -129,7 +124,7 @@ class pmdata(object):
 		self.add(pp['value'], nv, self.PostParamValues)
 		self.add(pp['value'], nv, self.AllValues)
 		if pp['httpparams']['proto'] == 'https':
-			self.add(pp['value'], nv, self.SecureValues)
+			self.add(pp['value'], nv, self.SSLValues)
 		else:
 			self.add(pp['value'], nv, self.ClearValues)
 

@@ -426,6 +426,9 @@ def main(prog, *args):
 	Verbosity = opts.verbosity
 	if Verbosity > 1: print '[d] main: verbosity: '+str(Verbosity)
 
+	# increase recursion depth for hash stuff in pmdata
+	sys.setrecursionlimit(2500)
+
 	if opts.version:
 		print "ProxMon version %s" % __version__
 		return

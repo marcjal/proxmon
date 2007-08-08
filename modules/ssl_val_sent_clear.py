@@ -6,11 +6,11 @@ class ssl_val_sent_clear(check):
 	"Find values set over SSL that later go cleartext"
 
 	def run(self, pmd):
-		for sv in pmd.SecureValues:
+		for sv in pmd.SSLValues:
 			if sv in trivial_values: continue
 			if sv in pmd.ClearValues:
 				for cv in pmd.ClearValues[sv]:
-					fsv = pmd.SecureValues[sv][0]
+					fsv = pmd.SSLValues[sv][0]
 					if fsv['type'] == 'sentcookie': continue
 					desc = "[*] Value set over SSL sent clear: " \
 						"value %s (set by %s in %s) seen as %s %s " \
