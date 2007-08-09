@@ -48,10 +48,10 @@ from pmdata import *
 from pmproxy import *
 from transaction import *
 
-#try:
-#	import debug # Newsh's debug library
-#except ImportError:
-#	pass
+try:
+	import debug # Newsh's debug library
+except ImportError:
+	pass
 
 Verbosity = 0
 TIDs = None

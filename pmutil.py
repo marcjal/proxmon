@@ -7,7 +7,8 @@ Various utility functions used by both proxmon and modules
 import os, re, sys
 import md5, base64
 
-trivial_values = ['', 'False', 'True', 'true', 'false', 
+trivial_values = ['', 'False', 'True', 'true', 'false',
+					'yes', 'no', 'Yes', 'No', 'YES', 'NO',
 					'en-us', 'en-US', 'en_US', 'en', 'us',
 					'utf-8', 'UTF-8', 'firefox-a', '32-bit', '420', '1.5', 
 					'640x480', '800x600', '1024x768', '1400x1050', '1600x1200',
