@@ -388,9 +388,15 @@ def main(prog, *args):
 			help='Only run once, instead of continually scanning the directory')
 	optp.add_option('-A', '--all', action='store_true', dest='all', 
 			help='Process all sessions in the provided location')
+	optp.add_option('-b', '--base64', action='store_true', dest='base64', 
+			help='Try harder to do base64 decodes')
+	optp.add_option('-B', '--base64confirm', action='store_true', 
+			dest='base64confirm', 
+			help='Be aggressive, but let the user confirm')
 	optp.add_option('-c', '--cookies', dest='cookies', action='store_true',
 			help='Show cookie summary information')
-	optp.add_option('-d', '--datasource', dest='datasource', help='Directory to scan')
+	optp.add_option('-d', '--datasource', dest='datasource', 
+			help='Directory to scan')
 	optp.add_option('-f', '--filter', dest='filter', default='',
 			help='Filter transactions.  Only include transactions where the URL'
 			' contains the provided string')
@@ -542,6 +548,9 @@ def main(prog, *args):
 
 	try:
 		pmd = pmdata()
+		if opts.base64 or opts.base64confirm:
+			pmd.b64opts(opts.base64, opts.base64confirm)
+
 		if opts.datasource:
 			print '[*] Processing session %s in %s' % (opts.session['id'], 
 														opts.datasource)
