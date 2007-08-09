@@ -16,6 +16,11 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
+# XXX - Beta version
+# TODO before release:
+#  - b64 and hash stuff needs more testing
+#  - dsniff needs testing
+#
 """
 ProxMon parses proxy logs and reports on common web application weaknesses
 

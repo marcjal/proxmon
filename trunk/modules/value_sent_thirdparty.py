@@ -9,7 +9,7 @@ class value_sent_thirdparty(check):
 		for k in pmd.AllValues:
 			if k in trivial_values: continue
 			domains = {}
-			for v in pmd.AllValues[k]:
+			for v in pmd.find_value(k, pmd.AllValues):
 				d = v['httpparams']['domain']
 				if d in domains:
 					domains[d].append(v)
