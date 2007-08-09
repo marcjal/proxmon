@@ -260,5 +260,8 @@ class pmdata(object):
 		"""
 		self.Transactions.extend([trans])
 
-	def find_value(self, value):
-		pass
+	def find_value(self, key, source):
+		if type(source[key]) == list:
+			return source[key]
+		elif type(source[key]) == str:
+			return source[source[key]]
