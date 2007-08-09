@@ -3,7 +3,9 @@
 """
 Datastore populated by proxy log parsers and consumed by modules
 """
-import md5, base64, sha, re
+import md5, base64, sha, re, urllib
+
+b64padding = ['==', '--', '$$']
 
 def md5sum(data):
 	m = md5.new(data)
@@ -18,40 +20,103 @@ def sha1sum(data):
 #        padding: =
 	# misc: no padding
 	# others: padding - instead of =
-def b64d(data):
-	return base64.standard_b64decode(data)
+def b64d(s):
+	return base64.b64decode(s)
 
-def b64d_url(data):
-	return base64.urlsafe_b64decode(data)
+def b64d_urldecode(s):
+	return base64.urlsafe_b64decode(urllib.unquote(s))
 
-def b64d_regex(data):
-	return base64.b64decode(data, '!-')
+def b64d_url(s):
+	return base64.urlsafe_b64decode(s)
 
-def b64d_xml1(data):
-	return base64.b64decode(data, '_-')
+def b64d_regex(s):
+	return base64.b64decode(s, '!-')
 
-def b64d_xml2(data):
-	return base64.b64decode(data, '._')
+def b64d_xml1(s):
+	return base64.b64decode(s, '_-')
 
-def b64d_miscpad1(data):
-	if data[-2:] == '--':
-		return base64.b64decode(re.sub('-','=', data))
+def b64d_xml2(s):
+	return base64.b64decode(s, '._')
 
-def b64d_nopad(data):
-	if data[-1] != data[-2]:
-		return base64.b64decode(data+'==')
+def b64d_misc1(s):
+	return base64.b64decode(s, '*!')
+
+def b64d_nopad(s):
+	if s[-1] != s[-2]:
+		return base64.b64decode(s+'==')
 
 class pmdata(object):
+	b64tryharder = False
+	b64confirm = False
+	b64confirmed = {}
+
+	def b64opts(self, tryhard, confirm):
+		if tryhard: self.b64tryharder = True
+		if confirm: self.b64confirm = True
+
 	def add(self, key, data, dest):
-		# see if it's b64 encoded and handle
-		if key[-2:] == '--' or key[-2:] == '==':
-			for f in [b64d, b64d_url, b64d_regex, b64d_xml1, b64d_xml2, 
-					  b64d_miscpad1]:
+		#print "[d] Adding %s" % (key)
+		if key == '': return
+		# see if it's likely b64 encoded
+		# XXX - should do a test against the whole string and find chars
+		#       that aren't part of any of the b64 charsets and auto-reject
+		newkey = tmpkey = False
+		doit = False
+		keyend1 = key[-2:]
+		keyend2 = urllib.unquote(key[-6:])
+		keyend3 = key[-1:]
+		if keyend1 in b64padding:
+			newkey = ''.join([key[:-2], '=='])
+			#print "[d] newkey %s" % newkey
+		elif keyend2 in b64padding:
+			newkey = ''.join([urllib.unquote(key)[:-2], '=='])
+			#print "[d] newkey urlenc %s" % newkey
+		elif self.b64tryharder:
+			if keyend3 in ['=', '-']:
+				newkey = ''.join([key[:-1], '=='])
+			elif urllib.unquote(keyend3) in ['=', '-']:
+				newkey = ''.join([urllib.unquote(key)[:-1], '=='])
+		elif self.b64confirm:
+			if key in self.b64confirmed:
+				doit = self.b64confirmed[key]
+			else:
+				tmpkey = urllib.unquote(key)
+				if len(tmpkey) < 2:
+					tmpkey = ''.join([tmpkey, '=='])
+				elif tmpkey[-1] in ['=','-'] and tmpkey[-2] != tmpkey[-1]:
+					tmpkey = ''.join([tmpkey[:-1], '=='])
+				else:
+					tmpkey = ''.join([tmpkey, '=='])
 				try:
-					dec = f(key)
-					if not dec: continue
-					if dec in dest: dest[dec].append(data)
-					else: dest[dec] = [data]
+					ask = "[?] (Y/N) Base64 decode:\n  %s\n  --to--\n  %s? " % (urllib.unquote(key),
+										urllib.quote(base64.b64decode(tmpkey)))
+					resp = raw_input(ask)
+					if resp in ['Y', 'y']: doit = True
+					else: doit = False
+				except:
+					doit = False
+				self.b64confirmed[key] = doit
+
+		if self.b64confirm and doit:
+			newkey = tmpkey
+
+		if newkey:
+			for f in [b64d, b64d_urldecode, 
+					  b64d_url, b64d_regex, b64d_xml1, b64d_xml2, b64d_misc1]:
+				try:
+					dec = f(newkey)
+					if not dec: 
+						#print "[d] not dec"
+						continue
+					#dec = urllib.quote(dec) # XXX should this be escaped?
+					if dec in dest: 
+						#print "[d] added b64d to existing: %s" % dec
+						dest[dec].append(data)
+						break
+					else: 
+						#print "[d] added b64d to new: %s" % dec
+						dest[dec] = [data]
+						break
 				except TypeError, e: 
 					if e.message == 'Incorrect padding': pass
 
@@ -62,9 +127,9 @@ class pmdata(object):
 		if key in dest: 
 			if type(dest[key]) == list:
 				dest[key].append(data)
-			elif type(dest[key]) == str:
+			elif type(dest[key]) == str:  # pointer to unhashed
 				redir = dest[key]
-				print "dest[key] is a str (key %s), appending at redir %s" % (key, redir)
+				#print "dest[key] is a str (key %s), appending at redir %s" % (key, redir)
 				dest[redir].append(data)
 			else:
 				print '[x] unexpected error in pmdata.add()'
@@ -73,7 +138,7 @@ class pmdata(object):
 		else: dest[key] = [data]
 
 		# try hashing the value and see if the hash matches anything we've seen
-		for f in [md5sum, sha1sum, base64.b64encode]:
+		for f in [md5sum, sha1sum]:
 			h = f(key)
 			if not h: continue
 			if h in dest and type(dest[h]) == list:
@@ -81,6 +146,9 @@ class pmdata(object):
 				del dest[h]
 				dest[h] = key
 
+		# XXX if the value is the same length as a hash, add to PossibleHashes
+		# XXX if a subsection of a value is the same format as a basic b64
+		#     block, flag it.
 
 	def __init__(self):
 		self.Transactions = []
@@ -102,6 +170,8 @@ class pmdata(object):
 		self.ClearValues = {}
 		self.SSLValues = {}
 		self.AllValues = {}
+
+		self.PossibleHashes = {}
 
 	def add_setcookie(self, c):
 		"""
