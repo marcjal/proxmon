@@ -187,16 +187,28 @@ if __name__ == '__main__':
 
 	sc = ssl_config()
 
-	print 'Testing bitland.net, no proxy'
-	sc.check_key('bitland.net', 443)
-	sc.check_methods('bitland.net', 443)
-	sc.check_ciphers('bitland.net', 443)
+	if len(sys.argv) > 1: 
+		hostname = sys.argv[1]
 
-	os.environ['https_proxy'] = 'localhost:8111'
-	print 'Testing gmail.google.com, with proxy %s' % os.environ['https_proxy']
-	sc.check_key('gmail.google.com', 443)
-	sc.check_methods('gmail.google.com', 443)
-	sc.check_ciphers('gmail.google.com', 443)
-	del os.environ['https_proxy']
+		if len(sys.argv) > 2: port = int(sys.argv[2])
+		else: port = 443
+
+		print 'Testing %s:%s, no proxy' % (hostname, port)
+		sc.check_key(hostname, port)
+		sc.check_methods(hostname, port)
+		sc.check_ciphers(hostname, port)
+
+	else:
+		print 'Testing bitland.net, no proxy'
+		sc.check_key('bitland.net', 443)
+		sc.check_methods('bitland.net', 443)
+		sc.check_ciphers('bitland.net', 443)
+
+		os.environ['https_proxy'] = 'localhost:8111'
+		print 'Testing gmail.google.com, with proxy %s' % os.environ['https_proxy']
+		sc.check_key('gmail.google.com', 443)
+		sc.check_methods('gmail.google.com', 443)
+		sc.check_ciphers('gmail.google.com', 443)
+		del os.environ['https_proxy']
 
 	sc.show_all()

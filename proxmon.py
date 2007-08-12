@@ -17,6 +17,10 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 # XXX - Beta version
+# XXX - Online checks ignoring -f filter option
+#       - Need to trace this, filtered transactions shouldn't be added
+#         to pmd in the first place, so checks shouldn't ever find out
+#         about them
 # TODO before release:
 #  - b64 and hash stuff needs more testing
 #  - dsniff needs testing
@@ -91,9 +95,10 @@ def parsetrans(t, checks, pmd, urlfilter):
 		if t['id'] not in TIDs: return None
 
 	tinfo = {'id': t['id']}
-	if not (chk_fmt(t['request'])and chk_fmt(t['response'])): return False
+	if not (chk_fmt(t['request']) and chk_fmt(t['response'])): return False
 	if parserequest(t['request'], checks, tinfo, pmd, urlfilter):
 		if parseresponse(t['response'], checks, tinfo, pmd, urlfilter):
+			#print '[d] about to add trans %s' % t['id']
 			pmd.add_transactions(tinfo)
 			ProxCJ.update(t['request'], t['response'])
 			if Extract: extract_trans(tinfo)
