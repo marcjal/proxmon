@@ -196,7 +196,7 @@ def parserequest(data, checks, t, pmd, urlfilter):
 			return False
 		t.update(rlinfo)
 		if t['url'].find(urlfilter) < 0:
-			if Verbosity: print '[d] parserequest: Skipped %s (filtered - %s)' % (t['id'], urlfilter)
+			if Verbosity: print "[d] parserequest: Skipped %s (filtered - %s didn't contain %s)" % (t['id'], t['url'], urlfilter)
 			return None
 		for qs in t['qs']:
 			qst = qs.copy()

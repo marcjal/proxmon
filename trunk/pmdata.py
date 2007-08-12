@@ -6,6 +6,10 @@ Datastore populated by proxy log parsers and consumed by modules
 import md5, base64, sha, re, urllib
 
 b64padding = ['==', '--', '$$']
+hashlengths = [16, 32, 24, 48] # 128 bit is 16 binary, 32 in hex
+							   # 192 bit is 24 binary, 48 in hex
+b64charset = r"[\w!-.+/*!=]"
+hexcharset = r"[ABCDEF\d]"
 
 def md5sum(data):
 	m = md5.new(data)
@@ -18,8 +22,7 @@ def sha1sum(data):
 # A series of base64 decodes to handle all of the weird variants commonly seen
 # stock: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/
 #        padding: =
-	# misc: no padding
-	# others: padding - instead of =
+# variants sub +/ to !-. _-, ._, *! and sub = to -, $ or have no padding
 def b64d(s):
 	return base64.b64decode(s)
 
@@ -55,73 +58,73 @@ class pmdata(object):
 		if confirm: self.b64confirm = True
 
 	def add(self, key, data, dest):
-		#print "[d] Adding %s" % (key)
+		print "[d] Adding %s" % (key)
 		if key == '': return
-		# see if it's likely b64 encoded
-		# XXX - should do a test against the whole string and find chars
-		#       that aren't part of any of the b64 charsets and auto-reject
-		newkey = tmpkey = False
-		doit = False
-		keyend1 = key[-2:]
-		keyend2 = urllib.unquote(key[-6:])
-		keyend3 = key[-1:]
-		if keyend1 in b64padding:
-			newkey = ''.join([key[:-2], '=='])
-			#print "[d] newkey %s" % newkey
-		elif keyend2 in b64padding:
-			newkey = ''.join([urllib.unquote(key)[:-2], '=='])
-			#print "[d] newkey urlenc %s" % newkey
-		elif self.b64tryharder:
-			if keyend3 in ['=', '-']:
-				newkey = ''.join([key[:-1], '=='])
-			elif urllib.unquote(keyend3) in ['=', '-']:
-				newkey = ''.join([urllib.unquote(key)[:-1], '=='])
-		elif self.b64confirm:
-			if key in self.b64confirmed:
-				doit = self.b64confirmed[key]
-			else:
-				tmpkey = urllib.unquote(key)
-				if len(tmpkey) < 2:
-					tmpkey = ''.join([tmpkey, '=='])
-				elif tmpkey[-1] in ['=','-'] and tmpkey[-2] != tmpkey[-1]:
-					tmpkey = ''.join([tmpkey[:-1], '=='])
+		# see if it's likely b64 encoded (scans for characters not used in b64)
+		if not re.search(b64charset, key):
+			newkey = tmpkey = False
+			doit = False
+			keyend1 = key[-2:]
+			keyend2 = urllib.unquote(key[-6:])
+			keyend3 = key[-1:]
+			if keyend1 in b64padding:
+				newkey = ''.join([key[:-2], '=='])
+				#print "[d] newkey %s" % newkey
+			elif keyend2 in b64padding:
+				newkey = ''.join([urllib.unquote(key)[:-2], '=='])
+				#print "[d] newkey urlenc %s" % newkey
+			elif self.b64tryharder:
+				if keyend3 in ['=', '-']:
+					newkey = ''.join([key[:-1], '=='])
+				elif urllib.unquote(keyend3) in ['=', '-']:
+					newkey = ''.join([urllib.unquote(key)[:-1], '=='])
+			elif self.b64confirm:
+				if key in self.b64confirmed:
+					doit = self.b64confirmed[key]
 				else:
-					tmpkey = ''.join([tmpkey, '=='])
-				try:
-					ask = "[?] (Y/N) Base64 decode:\n  %s\n  --to--\n  %s? " % (urllib.unquote(key),
-										urllib.quote(base64.b64decode(tmpkey)))
-					resp = raw_input(ask)
-					if resp in ['Y', 'y']: doit = True
-					else: doit = False
-				except:
-					doit = False
-				self.b64confirmed[key] = doit
+					tmpkey = urllib.unquote(key)
+					if len(tmpkey) < 2:
+						tmpkey = ''.join([tmpkey, '=='])
+					elif tmpkey[-1] in ['=','-'] and tmpkey[-2] != tmpkey[-1]:
+						tmpkey = ''.join([tmpkey[:-1], '=='])
+					else:
+						tmpkey = ''.join([tmpkey, '=='])
+					try:
+						ask = "[?] (Y/N) Base64 decode:\n  %s\n  --to--\n  %s? " % (urllib.unquote(key),
+											urllib.quote(base64.b64decode(tmpkey)))
+						resp = raw_input(ask)
+						if resp in ['Y', 'y']: doit = True
+						else: doit = False
+					except:
+						doit = False
+					self.b64confirmed[key] = doit
 
-		if self.b64confirm and doit:
-			newkey = tmpkey
+			if self.b64confirm and doit:
+				newkey = tmpkey
 
-		if newkey:
-			for f in [b64d, b64d_urldecode, 
-					  b64d_url, b64d_regex, b64d_xml1, b64d_xml2, b64d_misc1]:
-				try:
-					dec = f(newkey)
-					if not dec: 
-						#print "[d] not dec"
-						continue
-					#dec = urllib.quote(dec) # XXX should this be escaped?
-					if dec in dest: 
-						#print "[d] added b64d to existing: %s" % dec
-						dest[dec].append(data)
-						break
-					else: 
-						#print "[d] added b64d to new: %s" % dec
-						dest[dec] = [data]
-						break
-				except TypeError, e: 
-					if e.message == 'Incorrect padding': pass
+			if newkey:
+				for f in [b64d, b64d_urldecode, b64d_url, 
+						  b64d_regex, b64d_xml1, b64d_xml2, b64d_misc1]:
+					try:
+						dec = f(newkey)
+						if not dec: 
+							#print "[d] not dec"
+							continue
+						#dec = urllib.quote(dec) # XXX should this be escaped?
+						if dec in dest: 
+							print "[d] added b64d to existing: %s" % dec
+							dest[dec].append(data)
+							break
+						else: 
+							print "[d] added b64d to new: %s" % dec
+							dest[dec] = [data]
+							break
+					except TypeError, e: 
+						if e.message == 'Incorrect padding': pass
 
-		# XXX handle b64d_nopad - will work on most strings, but result is
-		# generally wrong
+			# XXX handle b64d_nopad - will work on most strings, but result is
+			#     generally wrong
+			# XXX short strings tend not to have padding? - check b64 spec!
 
 		# key already exists
 		if key in dest: 
@@ -146,7 +149,15 @@ class pmdata(object):
 				del dest[h]
 				dest[h] = key
 
-		# XXX if the value is the same length as a hash, add to PossibleHashes
+		# if the value is the same length as a hash, add to PossibleHashes
+		keylen = len(key)
+		if keylen in hashlengths:
+			if keylen == 16 or keylen == 24 or not re.search(hexcharset, key):
+				if key in self.PossibleHashes:
+					self.PossibleHashes[key].append(data)
+				else:
+					self.PossibleHashes[key] = [data]
+
 		# XXX if a subsection of a value is the same format as a basic b64
 		#     block, flag it.
 
@@ -265,3 +276,16 @@ class pmdata(object):
 			return source[key]
 		elif type(source[key]) == str:
 			return source[source[key]]
+
+if __name__ == '__main__':
+	print '[*] Testing B64 stuff'
+
+	b64strings= [
+		'dGVzdDAx',
+		'YXNkZmFzZGY=',
+		'YXNkZmFzZGZhc2RmYXNkZg==']
+	
+	for s in b64strings:
+		for f in [b64d]:
+			if base64.b64encode(f(s)) != f(s):
+				print "error with %s" % s
