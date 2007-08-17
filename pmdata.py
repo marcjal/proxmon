@@ -3,13 +3,23 @@
 """
 Datastore populated by proxy log parsers and consumed by modules
 """
-import md5, base64, sha, re, urllib
+import md5, base64, sha, re, urllib, logging
 
-b64padding = ['==', '--', '$$']
-hashlengths = [16, 32, 24, 48] # 128 bit is 16 binary, 32 in hex
-							   # 192 bit is 24 binary, 48 in hex
-b64charset = r"[\w!-.+/*!=]"
-hexcharset = r"[ABCDEF\d]"
+hashlengths = [16, 32, 20, 40, 24, 48, 32, 64] 
+							   # 128 bit is 16 binary, 32 hex (MD5)
+							   # 160 bit is 20 binary, 40 hex (SHA-1)
+							   # 192 bit is 24 binary, 48 hex (TIGER)
+							   # 256 bit is 32 binary, 64 hex (SHA-256)
+nonhexchars = r"[^A-Fa-f\d]"   # regex
+
+log = logging.getLogger("proxmon")
+vallog = logging.getLogger("pxmvalues")
+vallog.setLevel(logging.DEBUG)
+vallog.addHandler(logging.FileHandler('values.pxm', 'wb+'))
+
+def hashformat(s):
+	if len(s) in hashlengths and not re.search(nonhexchars, s):
+		return True
 
 def md5sum(data):
 	m = md5.new(data)
@@ -22,31 +32,73 @@ def sha1sum(data):
 # A series of base64 decodes to handle all of the weird variants commonly seen
 # stock: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/
 #        padding: =
-# variants sub +/ to !-. _-, ._, *! and sub = to -, $ or have no padding
+# variants sub +/ to !-. _-, ._, *! and pad with - or $ or have no padding
+# relevant RFC's: 989, 2152, 2440, 4648
 def b64d(s):
-	return base64.b64decode(s)
-
-def b64d_urldecode(s):
-	return base64.urlsafe_b64decode(urllib.unquote(s))
+	d = base64.b64decode(s)
+	e = base64.b64encode(d)
+	vallog.debug("  Trying b64d: %s -> %s" % (s, e))
+	if s == e: return d
 
 def b64d_url(s):
-	return base64.urlsafe_b64decode(s)
+	d = base64.b64decode(s, '-_')
+	e = base64.b64encode(d, '-_')
+	vallog.debug("  Trying b64d_url: %s -> %s" % (s, e))
+	if s == e: return d
 
 def b64d_regex(s):
-	return base64.b64decode(s, '!-')
+	d = base64.b64decode(s, '!-')
+	e = base64.b64encode(d, '!-')
+	vallog.debug("  Trying b64d_regex: %s -> %s" % (s, e))
+	if s == e: return d
 
 def b64d_xml1(s):
-	return base64.b64decode(s, '_-')
+	d = base64.b64decode(s, '_-')
+	e = base64.b64encode(d, '_-')
+	vallog.debug("  Trying b64d_xml1: %s -> %s" % (s, e))
+	if s == e: return d
 
 def b64d_xml2(s):
-	return base64.b64decode(s, '._')
+	d = base64.b64decode(s, '._')
+	e = base64.b64encode(d, '._')
+	vallog.debug("  Trying b64d_xml2: %s -> %s" % (s, e))
+	if s == e: return d
 
 def b64d_misc1(s):
-	return base64.b64decode(s, '*!')
+	d = base64.b64decode(s, '*!')
+	e = base64.b64encode(d, '*!')
+	vallog.debug("  Trying b64d_misc1: %s -> %s" % (s, e))
+	if s == e: return d
 
-def b64d_nopad(s):
-	if s[-1] != s[-2]:
-		return base64.b64decode(s+'==')
+def b64normalize(s):
+	f = r"([A-Za-z\d+/!\-_.*]{2,})([=$]*)" # regex, no %, use on unquoted
+	if len(s) < 2:
+		vallog.debug("b64n_skip: Too short")
+		return
+	m = re.search(f, s)
+	if m: 
+		if not len(m.group()) == len(s):
+			vallog.debug(" b64n_skip: match != whole string %s" % s)
+			return
+
+		if len(m.group(2)) == 2:  # if there are two pad chars, they must match
+			if not m.group(2)[0] == m.group(2)[1]:
+				vallog.debug(" b64n_skip: two mismatched pad chars : %s" % s)
+				return
+
+		# get rid of short matches w/o pad since stuff like 'true' will decode
+		if len(m.group()) < 5 and (len(m.group(2)) < 1 or m.group()[-1] == '-'):
+			vallog.debug(" b64n_skip: short match w/ no pad (%s)", m.group())
+			return
+
+		vallog.debug(" key is b64 format (%s)" % s)
+		# have to handle '-' padding separately since it's valid in non-pad
+		if m.group(1)[-2] == '-':
+			return m.group(1)[:-2] + '=='
+		if m.group(1)[-2] == '-':
+			return m.group(1)[:-1] + '='
+		return m.group(1) + "=" * len(m.group(2))
+	vallog.debug(" b64n_skip: regex not matched (%s)" % m.group())
 
 class pmdata(object):
 	b64tryharder = False
@@ -58,73 +110,66 @@ class pmdata(object):
 		if confirm: self.b64confirm = True
 
 	def add(self, key, data, dest):
-		print "[d] Adding %s" % (key)
-		if key == '': return
+		if key == '':
+			log.debug("Not adding empty key")
+			return
+
+		log.debug("Adding %s" % (key))
+		vallog.warn('----------------')
+		vallog.warn('key: %s' % key)
 		# see if it's likely b64 encoded (scans for characters not used in b64)
-		if not re.search(b64charset, key):
-			newkey = tmpkey = False
-			doit = False
-			keyend1 = key[-2:]
-			keyend2 = urllib.unquote(key[-6:])
-			keyend3 = key[-1:]
-			if keyend1 in b64padding:
-				newkey = ''.join([key[:-2], '=='])
-				#print "[d] newkey %s" % newkey
-			elif keyend2 in b64padding:
-				newkey = ''.join([urllib.unquote(key)[:-2], '=='])
-				#print "[d] newkey urlenc %s" % newkey
-			elif self.b64tryharder:
-				if keyend3 in ['=', '-']:
-					newkey = ''.join([key[:-1], '=='])
-				elif urllib.unquote(keyend3) in ['=', '-']:
-					newkey = ''.join([urllib.unquote(key)[:-1], '=='])
-			elif self.b64confirm:
+		unquotedkey = urllib.unquote(key)
+		normalizedkey = b64normalize(unquotedkey)
+		if normalizedkey and not hashformat(unquotedkey):
+			doit = True
+			if self.b64confirm:
 				if key in self.b64confirmed:
 					doit = self.b64confirmed[key]
 				else:
-					tmpkey = urllib.unquote(key)
-					if len(tmpkey) < 2:
-						tmpkey = ''.join([tmpkey, '=='])
-					elif tmpkey[-1] in ['=','-'] and tmpkey[-2] != tmpkey[-1]:
-						tmpkey = ''.join([tmpkey[:-1], '=='])
-					else:
-						tmpkey = ''.join([tmpkey, '=='])
 					try:
-						ask = "[?] (Y/N) Base64 decode:\n  %s\n  --to--\n  %s? " % (urllib.unquote(key),
-											urllib.quote(base64.b64decode(tmpkey)))
+						ask = "[?] (Y/N) Base64 decode:\n%s\nto\n%s" % (
+							unquotedkey, 
+							urllib.quote(base64.b64decode(unquotedkey)))
 						resp = raw_input(ask)
-						if resp in ['Y', 'y']: doit = True
-						else: doit = False
-					except:
-						doit = False
+						if resp not in ['Y', 'y']: doit = False
+					except: doit = False
 					self.b64confirmed[key] = doit
 
-			if self.b64confirm and doit:
-				newkey = tmpkey
-
-			if newkey:
-				for f in [b64d, b64d_urldecode, b64d_url, 
-						  b64d_regex, b64d_xml1, b64d_xml2, b64d_misc1]:
+			if doit:
+				b64success = False
+				for f in [b64d, b64d_url, b64d_regex, 
+							b64d_xml1, b64d_xml2, b64d_misc1]:
 					try:
-						dec = f(newkey)
+						dec = f(normalizedkey)
 						if not dec: 
-							#print "[d] not dec"
 							continue
-						#dec = urllib.quote(dec) # XXX should this be escaped?
-						if dec in dest: 
-							print "[d] added b64d to existing: %s" % dec
-							dest[dec].append(data)
-							break
-						else: 
-							print "[d] added b64d to new: %s" % dec
-							dest[dec] = [data]
+						else:
+							# get rid of things that have a bad UPPER lower ratio
+							upperc = len(re.findall(r'[A-Z]', normalizedkey))
+							lowerc = len(re.findall(r'[a-z]', normalizedkey))
+							if not (lowerc and upperc):
+								vallog.debug(" upper or lower is 0 - %s" % normalizedkey)
+								continue
+							r1 = float(upperc/lowerc)
+							r2 = float(lowerc/upperc)
+							vallog.debug(" upper/lower is %.03f, "
+										 "lower/upper is %.03f - %s" % (
+									r1, r2, normalizedkey))
+							if max(r1, r2) > 3:
+								vallog.debug(" bad ratio - %s" % normalizedkey)
+								continue
+							key = urllib.quote(dec)
+							log.debug("b64 decoded decoded: %s -> %s" % (
+									normalizedkey, key))
+							vallog.warn("    decoded: %s -> %s" % (
+									normalizedkey, key))
+							b64success = True
 							break
 					except TypeError, e: 
 						if e.message == 'Incorrect padding': pass
-
-			# XXX handle b64d_nopad - will work on most strings, but result is
-			#     generally wrong
-			# XXX short strings tend not to have padding? - check b64 spec!
+				if not b64success:
+					log.debug("Couldn't b64 decode")
+					vallog.warn("    Couldn't b64 decode %s", normalizedkey)
 
 		# key already exists
 		if key in dest: 
@@ -132,11 +177,11 @@ class pmdata(object):
 				dest[key].append(data)
 			elif type(dest[key]) == str:  # pointer to unhashed
 				redir = dest[key]
-				#print "dest[key] is a str (key %s), appending at redir %s" % (key, redir)
+				#log.warn("dest[key] is a str (key %s), appending at redir %s" % (key, redir))
 				dest[redir].append(data)
 			else:
-				print '[x] unexpected error in pmdata.add()'
-				print '    type is: %s, value %s' % (type(dest[key]), dest[key])
+				log.warn('[x] unexpected error in pmdata.add()')
+				log.warn('    type is: %s, value %s' % (type(dest[key]), dest[key]))
 		# key doesn't exist
 		else: dest[key] = [data]
 
@@ -152,7 +197,7 @@ class pmdata(object):
 		# if the value is the same length as a hash, add to PossibleHashes
 		keylen = len(key)
 		if keylen in hashlengths:
-			if keylen == 16 or keylen == 24 or not re.search(hexcharset, key):
+			if keylen == 16 or keylen == 24 or not re.search(nonhexchars, key):
 				if key in self.PossibleHashes:
 					self.PossibleHashes[key].append(data)
 				else:

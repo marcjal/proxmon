@@ -1,5 +1,5 @@
 "Find SSL server configuration issues"
-import os, re, sys, select, socket, string, urlparse
+import os, re, sys, select, socket, string, urlparse, pdb
 if __name__ == '__main__': sys.path.append('..')
 from pmcheck import *
 from pmutil import *
@@ -174,6 +174,7 @@ class ssl_config(netcheck):
 
 		end = len(pmd.Transactions)
 		for t in pmd.Transactions[self.lasttransaction:end]:
+			pdb.set_trace()
 			if((t['proto'] == 'https') and (t['server'] not in self.checked_hosts)):
 				self.check_key(t['hostname'], t['port'])
 				self.check_methods(t['hostname'], t['port'])
