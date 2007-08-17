@@ -21,9 +21,12 @@
 #       - Need to trace this, filtered transactions shouldn't be added
 #         to pmd in the first place, so checks shouldn't ever find out
 #         about them
+#       - filter is looking at whole url, which contains redirects like
+#         http://foo.com/redir?http://bar.com
 # TODO before release:
 #  - b64 and hash stuff needs more testing
 #  - dsniff needs testing
+#  - retest --extract, anything missing?
 #
 """
 ProxMon parses proxy logs and reports on common web application weaknesses
@@ -44,7 +47,7 @@ __copyright__ = '(c) 2006, 2007, Information Security Partners LLC.'
 __license__ = 'GPL'
 
 import os, re, sys, pdb, httplib, urllib, urllib2, cookielib
-import socket, time, string
+import socket, time, string, logging
 import cStringIO as StringIO
 import BeautifulSoup
 from optparse import OptionParser
@@ -74,7 +77,7 @@ for x in xrange(256):
 	if chr(x) not in okfnchars: FNTrans[x] = '_'
 FNTrans = ''.join(FNTrans)
 
-def parsetrans(t, checks, pmd, urlfilter):
+def parsetrans(t, checks, pmd, urlfilter, hostfilter):
 	"""
 	Parse a full HTTP transaction
 
@@ -82,8 +85,9 @@ def parsetrans(t, checks, pmd, urlfilter):
 		The request and response should be strings containing the whole req/resp
 	@param checks: a list of check instance to run
 	@param pmd: the datastore object
-	@param urlfilter: the filter to use when choosing transactions to process
-	@return: False indicates transaction error, None indicates filter not matched
+	@param urlfilter: url must contain this to be processed
+	@param hostfilter: hostname must contain this to be processed
+	@return: False indicates transaction error, None indicates the filters were not matched
 	"""
 	global ProxCJ
 	# XXX - this needs to determine whether a transaction on disk is complete
@@ -96,9 +100,11 @@ def parsetrans(t, checks, pmd, urlfilter):
 
 	tinfo = {'id': t['id']}
 	if not (chk_fmt(t['request']) and chk_fmt(t['response'])): return False
-	if parserequest(t['request'], checks, tinfo, pmd, urlfilter):
-		if parseresponse(t['response'], checks, tinfo, pmd, urlfilter):
-			#print '[d] about to add trans %s' % t['id']
+	res = parserequest(t['request'], checks, tinfo, pmd, urlfilter, hostfilter)
+	if res:
+		log.debug("parserequest returned %s" % res)
+		if parseresponse(t['response'], checks, tinfo, pmd):
+			#log.debug('about to add trans %s' % t['id'])
 			pmd.add_transactions(tinfo)
 			ProxCJ.update(t['request'], t['response'])
 			if Extract: extract_trans(tinfo)
@@ -133,7 +139,7 @@ def extract_trans(t):
 	f.write(t['respbody'])
 	f.close()
 
-def scan(wproxy, session, checks, pmd, urlfilter):
+def scan(wproxy, session, checks, pmd, urlfilter, hostfilter):
 	"""
 	Parse all transactions in a given directory
 
@@ -141,21 +147,22 @@ def scan(wproxy, session, checks, pmd, urlfilter):
 	@param session: dict containing session details
 	@param checks: list of check instances
 	@param pmd: proxmon datastore
-	@param urlfilter: url to match when processing transactions
+	@param urlfilter: url must contain this to be processed
+	@param hostfilter: host must contain this to be processed
 	"""
 	global Count
 
 	for t in session['transactions']:
 		rawt = wproxy.get(session, t)
-		if parsetrans(rawt, checks, pmd, urlfilter):
+		if parsetrans(rawt, checks, pmd, urlfilter, hostfilter):
 			Count += 1
 
 	for c in checks:
-		if Verbosity > 1: print '[d] scan: running check ' + c.__doc__
+		log.debug("scan: running check %s" % c.__doc__)
 		c.run(pmd)
 		c.show_all()
 
-def tail(wproxy, session, checks, pmd, urlfilter):
+def tail(wproxy, session, checks, pmd, urlfilter, hostfilter):
 	"""
 	Monitor a directory for new transactions
 
@@ -163,13 +170,14 @@ def tail(wproxy, session, checks, pmd, urlfilter):
 	@param session: dict containing session details
 	@param checks: list of check instances
 	@param pmd: proxmon datastore
-	@param urlfilter: url to match when processing transactions
+	@param urlfilter: url must contain this to be processed
+	@param hostfilter: host must contain this to be processed
 	"""
 	global Count
 
 	print '[*] Monitoring %s' % session['id']
 	print '[*] Parsing existing conversations ...'
-	scan(wproxy, session, checks, pmd, urlfilter)
+	scan(wproxy, session, checks, pmd, urlfilter, hostfilter)
 	print '[*] Parsed %d existing conversations' % Count
 
 	if not session['active']:
@@ -181,7 +189,7 @@ def tail(wproxy, session, checks, pmd, urlfilter):
 		didsomething = False
 		rawt = wproxy.get_next(session)
 		if rawt:
-			if parsetrans(rawt, checks, pmd, urlfilter):
+			if parsetrans(rawt, checks, pmd, urlfilter, hostfilter):
 				Count += 1
 			didsomething = True
 		else:
@@ -189,7 +197,7 @@ def tail(wproxy, session, checks, pmd, urlfilter):
 
 		if didsomething:
 			for c in checks:
-				if Verbosity > 1: print '[d] tail: running check ' + c.__doc__
+				log.debug('tail: running check ' % c.__doc__)
 				c.run(pmd)
 				c.show_new()
 
@@ -249,10 +257,10 @@ def load_checks(loadreg, loadnet, loadpostrun, exclude=[]):
 	# XXX - abspath doesn't return absolute path on win32 - Yay.
 	#if sys.platform[:6] == 'cygwin':
 	#	modpath = os.path.abspath(os.path.dirname(sys.argv[0])+os.sep+'modules')
-	if sys.platform == 'win32':
-		modpath = os.path.join(".\\modules") # XXX - hack
-	else:
-		modpath = './modules/'
+	#if sys.platform == 'win32':
+	#	modpath = os.path.join(".\\modules") # XXX - hack
+	#else:
+	#	modpath = './modules/'
 	modpath = os.path.dirname(os.path.abspath(sys.argv[0]))+os.sep+'modules'
 	sys.path.append(modpath)
 
@@ -407,8 +415,8 @@ def main(prog, *args):
 			help='Show cookie summary information')
 	optp.add_option('-d', '--datasource', dest='datasource', 
 			help='Directory to scan')
-	optp.add_option('-f', '--filter', dest='filter', default='',
-			help='Filter transactions.  Only include transactions where the URL'
+	optp.add_option('-f', '--hostfilter', dest='hostfilter', default='',
+			help='Filter by host.  Only include transactions where the host'
 			' contains the provided string')
 	optp.add_option('-i', '--interface', dest='interface', default='eth0',
 			help='Specify which interface pcap will listen on')
@@ -429,18 +437,35 @@ def main(prog, *args):
 	optp.add_option('-t', '--tid', dest='tid', default=None, action='callback', 
 			callback=opt_gettidlist,
 			help="Only process specified transaction id's")
+	optp.add_option('-u', '--urlfilter', dest='urlfilter', default='',
+			help='Filter by URL.  Only include transactions where the URL'
+			' contains the provided string')
 	optp.add_option('-v', '--verbose', action='count', dest='verbosity', 
 			help='Verbose output, use multiple times to increase', default=0)
 	optp.add_option('-V', '--version', action='store_true', dest='version', 
 			help='Display version information')
 	optp.add_option('-w', '--which', dest='which', default='webscarab',
 			help='Specify kind of proxy logs you want to parse')
-	optp.add_option('-x', '--extract', dest='extract', default=None, # XXX: finish
+	optp.add_option('-x', '--extract', dest='extract', default=None,
 			help='Extract files to the specified directory')
 	(opts, oargs) = optp.parse_args()
 
 	Verbosity = opts.verbosity
 	if Verbosity > 1: print '[d] main: verbosity: '+str(Verbosity)
+	# Python standard logging
+	log = logging.getLogger("proxmon")
+	log.setLevel(logging.DEBUG)
+	logformat = logging.Formatter("[d] %(message)s")
+	# console
+	log_con = logging.StreamHandler()
+	log_con.setLevel(40 - (Verbosity * 10))
+	log_con.setFormatter(logformat)
+	log.addHandler(log_con)
+	# file
+	log_file = logging.FileHandler('log.pxm', 'wb+')
+	log_file.setLevel(logging.DEBUG)
+	log_file.setFormatter(logformat)
+	log.addHandler(log_file)
 
 	# increase recursion depth for hash stuff in pmdata
 	sys.setrecursionlimit(2500)
@@ -545,7 +570,7 @@ def main(prog, *args):
 					print "[*] 0 transactions to process"
 					continue
 				print '\tWith transactions from: ' + ', '.join(s['domains'])
-				scan(wp, s, checks, pmd, opts.filter)
+				scan(wp, s, checks, pmd, opts.urlfilter, opts.hostfilter)
 				print '[*] %d transactions processed' % Count
 				tt += Count
 				for c in checks:
@@ -569,11 +594,11 @@ def main(prog, *args):
 
 		if opts.runonce:
 			print "[*] Running one time"
-			scan(wp, opts.session, checks, pmd, opts.filter)
+			scan(wp, opts.session, checks, pmd, opts.urlfilter, opts.hostfilter)
 			print '[*] Parsed %d transactions' % (Count)
 		else:
 			print "[*] Running in monitor mode"
-			tail(wp, opts.session, checks, pmd, opts.filter)
+			tail(wp, opts.session, checks, pmd, opts.urlfilter, opts.hostfilter)
 	except KeyboardInterrupt:
 		print "[*] Stopping at user's request, %d transactions parsed" % Count
 

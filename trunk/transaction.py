@@ -3,14 +3,15 @@
 """
 Generic Transaction processing routines
 """
-import os, re, sys, gzip, zlib, pdb
+import os, re, sys, gzip, zlib, pdb, logging
 import cStringIO as StringIO
 from urlparse import urlparse
 from pmutil import *
 
-Verbosity = 1
+log = logging.getLogger("proxmon")
 
 def chk_fmt(s):
+	httpver = ['HTTP/0.9', 'HTTP/1.0', 'HTTP/1.1']
 	if not s: return False
 	r = re.search(r'([^\n]+)([^\n]*)(.*)', s, re.DOTALL|re.MULTILINE)
 	if r:
@@ -18,10 +19,10 @@ def chk_fmt(s):
 		parts = re.split(r'\s', first, 3)
 		if len(parts) < 2:
 			return False
-		if parts[0].upper() in ['HTTP/0.9', 'HTTP/1.0', 'HTTP/1.1']:
+		if parts[0].upper() in httpver:
 			# response
 			return True
-		if len(parts) > 2 and parts[2].upper() in ['HTTP/0.9', 'HTTP/1.0', 'HTTP/1.1']:
+		if len(parts) > 2 and parts[2].upper() in httpver:
 			# request
 			return True
 	return False
@@ -38,7 +39,7 @@ def get_sentcookies(l, t, pmd):
 			t['sentcookies'].extend([cookies])
 		else:
 			t['sentcookies'] = cookies
-		if Verbosity > 1: print "[d] get_sentcookies: " + l
+		log.info("get_sentcookies: %s" % l)
 
 # Was fetch_cookies in webapp2.py
 def get_setcookie(l, t, pmd):
@@ -51,7 +52,7 @@ def get_setcookie(l, t, pmd):
 		else:
 			t['setcookies'] = [cookie]
 		pmd.add_setcookie(cookie)
-		if Verbosity > 1: print "[d] get_set_cookie: " + l
+		log.info("get_set_cookie: %s" % l)
 
 def get_querystring(s):
 	"""Extract the query string portion of an URL
@@ -176,7 +177,7 @@ def parserespline(l):
 			return resp
 	return None
 
-def parserequest(data, checks, t, pmd, urlfilter):
+def parserequest(data, checks, t, pmd, urlfilter, hostfilter):
 	"""
 	Parse a request
 
@@ -185,19 +186,30 @@ def parserequest(data, checks, t, pmd, urlfilter):
 	try:
 		if not data: return False
 		reqbody = None
-		if Verbosity > 1: print "[d] parserequest: Trying " + t['id']
+		log.info("parserequest: Trying %s" % t['id'])
 		t['rawreq'] = data
 		req = StringIO.StringIO(data)
+
 		# Handle request line
 		l = req.readline()
 		rlinfo = parsereqline(l)
 		if not rlinfo:
-			print "[x] Invalid HTTP request line (TID: %s)" % t['id']
+			log.warn("[x] Invalid HTTP request line (TID: %s)" % t['id'])
 			return False
 		t.update(rlinfo)
-		if t['url'].find(urlfilter) < 0:
-			if Verbosity: print "[d] parserequest: Skipped %s (filtered - %s didn't contain %s)" % (t['id'], t['url'], urlfilter)
+
+		# Filter stuff
+		if t['hostname'].find(hostfilter) < 0:
+			log.info("parserequest: Skipped %s (filtered - %s didn't contain %s)" % (t['id'], t['hostname'], hostfilter))
 			return None
+		else: 
+			log.info("parserequest: Processing %s (hostname %s matched %s or null filter)" % (t['id'], t['hostname'], hostfilter))
+		if t['url'].find(urlfilter) < 0:
+			log.info("parserequest: Skipped %s (filtered - %s didn't contain %s)" % (t['id'], t['url'], urlfilter))
+			return None
+		else: 
+			log.info("parserequest: Processing %s (url %s matched %s or null filter)" % (t['id'], t['url'], urlfilter))
+
 		for qs in t['qs']:
 			qst = qs.copy()
 			qst['httpparams'] = t
@@ -210,7 +222,7 @@ def parserequest(data, checks, t, pmd, urlfilter):
 		while l != '\r\n': # XXX - will webscarab ever just do \n?
 			l = req.readline()
 			if l == '':
-				print "[d] parserequest: Skipped %s, headers didn't end" % t['id']
+				log.warn("parserequest: Skipped %s, headers didn't end" % t['id'])
 				return None
 			get_sentcookies(l, t, pmd)
 			m = re.search(r"^Host:\s(.*)", l, re.IGNORECASE)
@@ -246,22 +258,22 @@ def parserequest(data, checks, t, pmd, urlfilter):
 	except IOError, e:
 		if e:
 			if e.strerror == 'No such file or directory':
-				if Verbosity > 1: print '[d] Skipping nonexistent transaction %s' % t['id']
+				log.warn('Skipping nonexistent transaction %s' % t['id'])
 			else:
-				print '[x] parserequest: error processing TID %s, %s' % (t['id'], e.strerror)
+				log.info('parserequest: error processing TID %s, %s' % (t['id'], e.strerror))
 		else:
-			print "[x] parserequest: error processing TID %s" % (t['id'])
+			log.warn("parserequest: error processing TID %s" % (t['id']))
 		return False
 	return True
 
-def parseresponse(data, checks, t, pmd, urlfilter):
+def parseresponse(data, checks, t, pmd):
 	"""
 	Parse a response
 
 	Needs a full response in the form of a string in data (status line, headers and body)
 	"""
 	try:
-		if Verbosity > 1: print "[d] parseresponse: Trying " + t['id']
+		log.info("parseresponse: Trying " + t['id'])
 		respbody = None
 		gzipped = False
 		deflated = False
@@ -274,7 +286,7 @@ def parseresponse(data, checks, t, pmd, urlfilter):
 		l = resp.readline()
 		sl = parserespline(l)
 		if not sl:
-			print "[x] Invalid HTTP status line (Trans: %s)" % t['id']
+			log.warn("Invalid HTTP status line (Trans: %s)" % t['id'])
 		t.update(sl)
 		for c in checks:
 			c.sl_parse(l, t)
@@ -283,7 +295,7 @@ def parseresponse(data, checks, t, pmd, urlfilter):
 		while l != '\r\n':
 			l = resp.readline()
 			if l == '':
-				print "[d] parseresponse: Skipped %s, headers didn't end" % t['id']
+				log.warn("parseresponse: Skipped %s, headers didn't end" % t['id'])
 				return None
 			get_setcookie(l, t, pmd)
 			m = re.search(r"^Content-Type:\s(.*)", l, re.IGNORECASE)
@@ -306,9 +318,7 @@ def parseresponse(data, checks, t, pmd, urlfilter):
 			if 'respcontentlen' in t:
 				if len(s) != t['respcontentlen']:
 					return False
-					#print "[x] parseresponse: Content-Length doesn't match data read"
-					#print '\tLen Expected (from header cl): %s' % t['respcontentlen']
-					#print '\tLen Read: %s' % len(s)
+					log.info("[x] parseresponse: Content-Length %d doesn't match data read %d" % (t['respcontentlen'], len(s)))
 					#print '\tT: %s' % t
 					#pdb.set_trace()
 					# XXX: should give a hard error?
@@ -337,13 +347,13 @@ def parseresponse(data, checks, t, pmd, urlfilter):
 
 		if(respbody):
 			for c in checks:
-				if Verbosity > 1: print "[d] parseresponse: respbody check " + c.__doc__
+				log.info("parseresponse: respbody check %s" % c.__doc__)
 				c.resp_body_parse(respbody, t)
 			t['respbody'] = respbody
 
 	except IOError:
 		# XXX: should do something to mark t as bad?
-		print "[x] parseresponse: error proessing TID %s" % (t['id'])
+		log.warn("[x] parseresponse: error proessing TID %s" % (t['id']))
 		return False
 
 	return True
