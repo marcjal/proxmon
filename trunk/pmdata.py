@@ -69,6 +69,8 @@ def b64d_misc1(s):
 	e = base64.b64encode(d, '*!')
 	vallog.debug("  Trying b64d_misc1: %s -> %s" % (s, e))
 	if s == e: return d
+	if s[-1] == '=' and s[:-1] == e: return d
+	if s[-2] == '=' and s[:-2] == e: return d
 
 def b64normalize(s):
 	f = r"([A-Za-z\d+/!\-_.*]{2,})([=$]*)" # regex, no %, use on unquoted
@@ -87,7 +89,7 @@ def b64normalize(s):
 				return
 
 		# get rid of short matches w/o pad since stuff like 'true' will decode
-		if len(m.group()) < 5 and (len(m.group(2)) < 1 or m.group()[-1] == '-'):
+		if len(m.group()) < 13 and (len(m.group(2)) < 1 or m.group()[-1] != '-'):
 			vallog.debug(" b64n_skip: short match w/ no pad (%s)", m.group())
 			return
 
@@ -95,10 +97,10 @@ def b64normalize(s):
 		# have to handle '-' padding separately since it's valid in non-pad
 		if m.group(1)[-2] == '-':
 			return m.group(1)[:-2] + '=='
-		if m.group(1)[-2] == '-':
+		if m.group(1)[-1] == '-':
 			return m.group(1)[:-1] + '='
 		return m.group(1) + "=" * len(m.group(2))
-	vallog.debug(" b64n_skip: regex not matched (%s)" % m.group())
+	vallog.debug(" b64n_skip: regex not matched (%s)" % s)
 
 class pmdata(object):
 	b64tryharder = False
@@ -159,7 +161,7 @@ class pmdata(object):
 								vallog.debug(" bad ratio - %s" % normalizedkey)
 								continue
 							key = urllib.quote(dec)
-							log.debug("b64 decoded decoded: %s -> %s" % (
+							log.debug("b64 decoded: %s -> %s" % (
 									normalizedkey, key))
 							vallog.warn("    decoded: %s -> %s" % (
 									normalizedkey, key))
