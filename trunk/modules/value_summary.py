@@ -23,10 +23,13 @@ class value_summary(postruncheck):
 	def interesting_values(self, pmd):
 		"Point out interesting value names and strings"
 		for v in pmd.AllValues:
-			for i in xrange(len(pmd.AllValues[v])):
-				name = pmd.AllValues[v][i]['name']
-				if name in self.interesting_names:
-					cmsg("Interesting value name: %s (%s)" % (name, v))
+			# dict check to deal with pointer records from hashes
+			if isinstance(pmd.AllValues[v], list):
+				for i in xrange(len(pmd.AllValues[v])):
+					name = pmd.AllValues[v][i]['name']
+					if name in self.interesting_names:
+						cmsg("Interesting value name: %s (%s in TID %s)" % (
+							name, v, pmd.AllValues[v][i]['httpparams']['id']))
 
 	def report(self, pmd):
 		if not self.cfg: return
@@ -35,8 +38,9 @@ class value_summary(postruncheck):
 		cmsg("Saw %d unique values in %d conversations" % (
 				len(pmd.AllValues), len(pmd.Transactions)))
 
-		cmsg('-'*40)
-		self.summarize_values(pmd)
+		if self.verbosity:
+			cmsg('-'*40)
+			self.summarize_values(pmd)
 
 		cmsg('-'*40)
 		self.interesting_values(pmd)

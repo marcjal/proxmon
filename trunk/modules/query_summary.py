@@ -11,6 +11,8 @@ class query_summary(postruncheck):
 	def report(self, pmd):
 		# show parameter counts
 		cmsg('-' * 40)
+		cmsg('Query Summary')
+		cmsg('-' * 40)
 		qs_counts = {}
 		for q in pmd.QueryStrings:
 			if q['name'] not in qs_counts:
@@ -65,4 +67,3 @@ class query_summary(postruncheck):
 						cmsg('    QS: %s' % q)
 				else:
 					cmsg('  Path: %s' % p)
-			cmsg('-' * 20)
