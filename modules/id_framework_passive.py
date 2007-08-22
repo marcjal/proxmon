@@ -27,7 +27,8 @@ class id_framework_passive(check):
 						if ver: ver = '/' + ver.group(1)
 						else: ver = ''
 					else: ver = ''
-					desc = '[*] IDed framework: %s is using %s%s (%s)' % (t['server'], f['name'], ver, f['url'])
+					desc = 'IDed framework: %s is using %s%s (%s)' % (
+							t['server'], f['name'], ver, f['url'])
 					self.add_single(desc) # skip TID because this gets noisy
 
 	def resp_body_parse(self, body, t):
@@ -53,6 +54,7 @@ class id_framework_passive(check):
 							if ver: ver = '/'+ver.group(1)
 							else: ver=''
 						else: ver = ''
-						desc = '[*] IDed framework: %s is using %s%s (%s)' % (t['server'], f['name'], ver, f['url'])
+						desc = 'IDed framework: %s is using %s%s (%s)' % (
+								t['server'], f['name'], ver, f['url'])
 						self.add_single(desc, id=t['id'])
 

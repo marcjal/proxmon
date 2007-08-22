@@ -1,8 +1,10 @@
 "Find SSL server configuration issues"
-import os, re, sys, select, socket, string, urlparse, pdb
+import os, re, sys, select, socket, string, urlparse, pdb, logging
 if __name__ == '__main__': sys.path.append('..')
 from pmcheck import *
 from pmutil import *
+
+log = logging.getLogger("proxmon")
 
 try:
 	from OpenSSL import SSL
@@ -43,7 +45,7 @@ class ssl_config(netcheck):
 	def check_ssl_err(self, e):
 		# XXX: we're ignoring errors because they're likely things
 		#      like no cipher match, which is expected
-		#print '[x] error in ssl_config:proxy_conn_open %s' % e
+		log.debug('error in ssl_config:proxy_conn_open %s' % e)
 		pass
 
 	def conn_open(self, host, port, cipherlist=None):
@@ -56,7 +58,7 @@ class ssl_config(netcheck):
 			return sock
 		except SSL.Error, e:
 			self.check_ssl_err(e)
-		except socket.error: print '[x] ssl_config: error connecting to %s' % host
+		except socket.error: log.error('error connecting to %s' % host)
 		return None
 
 	def proxy_conn_open(self, host, port, cipherlist=None):
@@ -76,7 +78,7 @@ class ssl_config(netcheck):
 			return sock
 		except SSL.Error, e:
 			self.check_ssl_err(e)
-		except socket.error: print '[x] ssl_config: error connecting to %s' % host
+		except socket.error: log.error('error connecting to %s' % host)
 		return None
 
 	def check_ciphers(self, host, port):
@@ -87,13 +89,13 @@ class ssl_config(netcheck):
 				sock.send("\n")
 				if not desired:
 					u = 'https://' + host + ':'+str(port)
-					desc = "[*] SSL Config issue %s: %s" % (u, desc)
+					desc = "SSL Config issue %s: %s" % (u, desc)
 					self.add_single(desc)
 				sock.shutdown()
 				sock.close()
 			except SSL.Error, e:
 				self.check_ssl_err(e)
-			except socket.error: print '[x] ssl_config: error connecting to %s' % host
+			except socket.error: log.error('error connecting to %s' % host)
 
 	def check_methods(self, host, port):
 		for method, desired, desc in self.methods:
@@ -104,13 +106,13 @@ class ssl_config(netcheck):
 				servercert = sock.get_peer_certificate()
 				if not desired:
 					u = 'https://' + host + ':'+str(port)
-					desc = "[*] SSL Config issue %s: %s" % (u, desc)
+					desc = "SSL Config issue %s: %s" % (u, desc)
 					self.add_single(desc)
 				sock.shutdown()
 				sock.close()
 			except SSL.Error, e:
 				self.check_ssl_err(e)
-			except socket.error: print '[x] ssl_config: error connecting to %s' % host
+			except socket.error: log.error('error connecting to %s' % host)
 
 	def proxy_check_key(self, host, port):
 		# POC for proxy_conn_open
@@ -130,15 +132,15 @@ class ssl_config(netcheck):
 			keylen = servercert.get_pubkey().bits()
 			u = 'https://' + host + ':'+str(port)
 			if keylen < 1024:
-				desc = "[*] SSL Config issue %s: %s" % (u, "Key is < 1024 bits")
+				desc = "SSL Config issue %s: %s" % (u, "Key is < 1024 bits")
 				self.add_single(desc)
 			#else: print "%s:%s keylen %d" % (host, port, keylen)
 			if servercert.has_expired():
-				desc = "[*] SSL Config issue %s: %s" % (u, "Cert has expired")
+				desc = "SSL Config issue %s: %s" % (u, "Cert has expired")
 				self.add_single(desc)
 		except SSL.Error, e:
 			self.check_ssl_err(e)
-		except socket.error: print '[x] ssl_config: error connecting to %s' % host
+		except socket.error: log.error('error connecting to %s' % host)
 
 	def check_key(self, host, port):
 		try:
@@ -149,14 +151,14 @@ class ssl_config(netcheck):
 			keylen = servercert.get_pubkey().bits()
 			u = 'https://' + host + ':'+str(port)
 			if keylen < 1024:
-				desc = "[*] SSL Config issue %s: %s" % (u, "Key is < 1024 bits")
+				desc = "SSL Config issue %s: %s" % (u, "Key is < 1024 bits")
 				self.add_single(desc)
 			if servercert.has_expired():
-				desc = "[*] SSL Config issue %s: %s" % (u, "Cert has expired")
+				desc = "SSL Config issue %s: %s" % (u, "Cert has expired")
 				self.add_single(desc)
 		except SSL.Error, e:
 			self.check_ssl_err(e)
-		except socket.error: print '[x] ssl_config: error connecting to %s' % host
+		except socket.error: log.error('error connecting to %s' % host)
 
 	def parse_proxy(self, proxy):
 		m = re.search(r'(http[s]{0,1}://){0,1}(\w+[.\w]*)(:(\d+)){0,1}(/){0,1}(.*)', proxy, re.I)
@@ -174,7 +176,7 @@ class ssl_config(netcheck):
 
 		end = len(pmd.Transactions)
 		for t in pmd.Transactions[self.lasttransaction:end]:
-			pdb.set_trace()
+			#pdb.set_trace()
 			if((t['proto'] == 'https') and (t['server'] not in self.checked_hosts)):
 				self.check_key(t['hostname'], t['port'])
 				self.check_methods(t['hostname'], t['port'])

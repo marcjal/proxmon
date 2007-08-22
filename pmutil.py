@@ -6,6 +6,7 @@ Various utility functions used by both proxmon and modules
 
 import os, re, sys
 import md5, base64
+import logging
 
 trivial_values = ['', 'False', 'True', 'true', 'false',
 					'yes', 'no', 'Yes', 'No', 'YES', 'NO',
@@ -23,6 +24,11 @@ js_comment_rx =   [r"/\*[^*]*\*+([^/*][^*]*\*+)*/", # /* */
 				   r"//[^\n]*\n"]                   # //
 html_comment_rx = [r"\<!\s*--(.*?)(--\s*\>)"]       # HTML comment
 comment_rx = js_comment_rx + html_comment_rx
+
+log = logging.getLogger("proxmon")
+
+def cmsg(msg, *args, **kwargs):
+	logging.getLogger("proxmon").log(60, msg, *args, **kwargs)
 
 def parse_set_cookie(header):
 	"""Converts a Set-Cookie header into a dict of Path, Domain, name and value
@@ -69,7 +75,7 @@ def parse_sent_cookies(header):
 			cookie["value"] = v.strip()
 			cookielist.append(cookie)
 		else:
-			print "[x] parse_sent_cookie: cookie has >< 2 parts" 
+			log.error("[x] parse_sent_cookie: cookie has >< 2 parts %s", c)
 			return []
 	return cookielist
 

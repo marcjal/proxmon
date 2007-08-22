@@ -19,5 +19,5 @@ class cookie_sent_on_qs(check):
 					if cv in pmd.SetCookieSSLValues:
 						if flags == '': flags = ' (SSL)'
 						else: flags = flags[:-1] + ', SSL)'
-					desc = "[*] Cookie value seen on QS: %s%s" % (cv, flags)
+					desc = "Cookie value seen on QS: %s%s" % (cv, flags)
 					self.add_single(desc, id=qv['httpparams']['id'])

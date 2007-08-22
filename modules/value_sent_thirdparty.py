@@ -19,5 +19,5 @@ class value_sent_thirdparty(check):
 			if len(domains) > 1:
 				for d in domains:
 					for x in xrange(len(domains[d])):
-						desc = "[*] Value (%s) sent to multiple domains: %s" % (k, d)
+						desc = "Value (%s) sent to multiple domains: %s" % (k, d)
 						self.add_single(desc, domains[d][x]['httpparams']['id'])

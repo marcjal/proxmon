@@ -3,11 +3,14 @@
 """
 Contains the base check classes (check, netcheck, postruncheck)
 """
-import os, sys
+import os, sys, logging
 import pdb
 import config
+from pmutil import *
 
 loaderror = False
+
+log = logging.getLogger("proxmon")
 
 class check(object):
 	"""
@@ -47,7 +50,8 @@ class check(object):
 		if self.cfg:
 			return True
 		if sys._getframe(1).f_code.co_name == '__init__':
-			print '[x] %s: Required configuration not found, skipping ...' % self.__module__
+			log.warn('%s: Required configuration not found, skipping ...' %
+							self.__module__)
 		return False
 
 	def load_config(self):
@@ -64,7 +68,7 @@ class check(object):
 			try:
 				return config.Config(cfgfilename)
 			except config.ConfigFormatError, e:
-				print "[x] Error parsing config file: %s %s" % (cfgfilename, e)
+				log.error("Error parsing config file: %s %s" % (cfgfilename, e))
 		return None
 
 	def show_all(self):
@@ -82,14 +86,15 @@ class check(object):
 		for r in resbyres:
 			if self.verbosity:
 				resstr = ', '.join([str(s['id']) for s in resbyres[r]])
-				print r + " (TID: %s)" % resstr
-				if 'verbose' in resbyres[r][0]: print resbyres[r][0]['verbose'].strip()
+				log.info("%s (TID: %s)" % (r, resstr))
+				if 'verbose' in resbyres[r][0]: 
+					log.info(resbyres[r][0]['verbose'].strip())
 			elif len(resbyres[r]) < 5:
 				resstr = ', '.join([str(s['id']) for s in resbyres[r]])
-				print r + " (TIDs: %s)" % resstr
+				cmsg("%s (TIDs: %s)" % (r, resstr))
 			else:
 				resstr = ', '.join([str(s['id']) for s in resbyres[r][:9]])
-				print r + " (TIDs: %s, ...)" % resstr
+				cmsg("%s (TIDs: %s, ...)" % (r, resstr))
 		self.lastreported = end
 
 	def show_new(self):
@@ -97,9 +102,9 @@ class check(object):
 		last = len(self.results)
 		if last > self.lastreported:
 			for r in self.results[self.lastreported:last+1]:
-				print r['result'] + ' (TID: ' + str(r['id']) + ')'
+				cmsg(r['result'] + ' (TID: ' + str(r['id']) + ')')
 				if self.verbosity:
-					if 'verbose' in r: print r['verbose']
+					if 'verbose' in r: cmsg(r['verbose'])
 			self.lastreported = last
 
 	def add_single(self, desc, id=0, verbose=None, module=None, value=None):

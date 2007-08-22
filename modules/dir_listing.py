@@ -21,7 +21,7 @@ class dir_listing(netcheck):
 					if d in self.checked_dirs_by_server[t['server']]:
 						continue
 				if urltesting.gives_directory_listing(t['proto']+'://'+t['server']+d):
-					desc = '[*] Listing of %s on %s succeeded' % (d, t['server'])
+					desc = 'Listing of %s on %s succeeded' % (d, t['server'])
 					self.add_single(desc)
 				if t['server'] in self.checked_dirs_by_server:
 					self.checked_dirs_by_server[t['server']].append(d)

@@ -40,7 +40,7 @@ class js_warn(check):
 				for m in p.findall(line):
 					# ignore if it's a constant string
 					if len(conststrp.findall(m)) != 1:
-						desc = '[*] Unsafe JavaScript found: %s at %s:%d' % (
+						desc = 'Unsafe JavaScript found: %s at %s:%d' % (
 							f, t['url'], linenum)
 						vlen = m.find('\n')
 						if (vlen>60 or vlen<0): m = m[:60] + ' ...'

@@ -21,7 +21,7 @@ class interesting_comments(check):
 				sp = re.compile(self.warn_rx, re.IGNORECASE)
 				sm = sp.search(cm.group())
 				if sm:
-					desc = '[*] Interesting comment: %s in %s' % (
+					desc = 'Interesting comment: %s in %s' % (
 							sm.group(1).strip(),t['url'])
 					len = cm.group()[sm.span()[0]:].find('\n')
 					if (len > 50 or len < 0): len = 50
