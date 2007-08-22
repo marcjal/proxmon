@@ -1,4 +1,5 @@
 "Summarize cookie information"
+import pdb
 from pmcheck import *
 from pmutil import *
 
@@ -70,26 +71,40 @@ class cookie_summary(postruncheck):
 		setcookienames = uniq_cookies(pmd.SetCookies)
 		cookienames = uniq_cookies(pmd.SetCookies+pmd.SentCookies)
 		setcookiesbyname = cookies_by_name(pmd.SetCookies)
+		cookiesbyname = cookies_by_name(pmd.SetCookies+pmd.SentCookies)
 		# XXX: unused - sentcookiesbyname = cookies_by_name(pmd.SentCookies)
 		# XXX: unused - sentcookienames = uniq_cookies(pmd.SentCookies)
 
+		cmsg('-' * 40)
+		cmsg('Cookie Summary')
 		cmsg('-' * 40)
 		cmsg("Saw %d unique cookie names in %d conversations" % (len(cookienames), len(pmd.Transactions)))
 		cmsg("Saw %d Set-Cookie headers, %d cookies sent by browser" % (len(pmd.SetCookies), len(pmd.SentCookies)))
 
 		cmsg('-'*40)
 		cmsg("Listing unique cookie names")
-		for c in cookienames:
-			cmsg(c)
+		for n in cookienames:
+			serverlist = []
+			for x in xrange(len(cookiesbyname[n])):
+				if cookiesbyname[n][x]['httpparams']['server'] in serverlist:
+					continue
+				serverlist.append(cookiesbyname[n][x]['httpparams']['server'])
+			cmsg("  %s: %s" % (n, ', '.join(serverlist)))
 
 		cmsg('-'*40)
 		cmsg('Listing Set-Cookie properties')
-		for c in setcookienames:
-			cmsg("Cookie: %s" % c)
-			cmsg(summarize_setcookie_param('domain', setcookiesbyname[c]))
-			cmsg(summarize_setcookie_param('path', setcookiesbyname[c]))
-			cmsg(summarize_setcookie_flags(setcookiesbyname[c]))
-			cmsg('-' * 20)
+		for n in setcookienames:
+			cmsg('-'*20)
+			tidlist = []
+			for c in cookiesbyname[n]:
+				for x in xrange(len(cookiesbyname[n])):
+					tid = cookiesbyname[n][x]['httpparams']['id']
+					if tid in tidlist: continue
+					tidlist.append(tid)
+			cmsg("Cookie: %s (TIDs %s)" % (n, ', '.join(tidlist)))
+			cmsg(summarize_setcookie_param('domain', setcookiesbyname[n]))
+			cmsg(summarize_setcookie_param('path', setcookiesbyname[n]))
+			cmsg(summarize_setcookie_flags(setcookiesbyname[n]))
 
 		if(self.verbosity > 1):
 			cmsg('-'*40)

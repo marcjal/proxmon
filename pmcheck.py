@@ -84,14 +84,12 @@ class check(object):
 				resbyres[r['result']] = [r]
 
 		for r in resbyres:
-			if self.verbosity:
+			if self.verbosity or len(resbyres[r]) < 5:
 				resstr = ', '.join([str(s['id']) for s in resbyres[r]])
-				log.info("%s (TID: %s)" % (r, resstr))
-				if 'verbose' in resbyres[r][0]: 
+				if resstr == '0': cmsg("%s" % (r))
+				else: cmsg("%s (TIDs: %s)" % (r, resstr))
+				if self.verbosity and 'verbose' in resbyres[r][0]:
 					log.info(resbyres[r][0]['verbose'].strip())
-			elif len(resbyres[r]) < 5:
-				resstr = ', '.join([str(s['id']) for s in resbyres[r]])
-				cmsg("%s (TIDs: %s)" % (r, resstr))
 			else:
 				resstr = ', '.join([str(s['id']) for s in resbyres[r][:9]])
 				cmsg("%s (TIDs: %s, ...)" % (r, resstr))

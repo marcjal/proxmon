@@ -5,7 +5,7 @@ Various utility functions used by both proxmon and modules
 """
 
 import os, re, sys
-import md5, base64
+import md5, sha, base64
 import logging
 
 trivial_values = ['', 'False', 'True', 'true', 'false',
@@ -16,9 +16,16 @@ trivial_values = ['', 'False', 'True', 'true', 'false',
 					'640', '768', '800', '1024', '1050', '1200', '1400', '1600',
 					'-', '/', '\\'
 				 ]
-trivial_values.extend(map(str, range(-1,101)))
+trivial_values.extend(map(str, range(-101,101)))
 trivial_values.extend(map(chr, range(ord('A'), ord('Z')+1)))
 trivial_values.extend(map(chr, range(ord('a'), ord('z')+1)))
+
+hashlengths = [16, 32, 20, 40, 24, 48, 32, 64] 
+							   # 128 bit is 16 binary, 32 hex (MD5)
+							   # 160 bit is 20 binary, 40 hex (SHA-1)
+							   # 192 bit is 24 binary, 48 hex (TIGER)
+							   # 256 bit is 32 binary, 64 hex (SHA-256)
+nonhexchars = r"[^A-Fa-f\d]"   # regex
 
 js_comment_rx =   [r"/\*[^*]*\*+([^/*][^*]*\*+)*/", # /* */
 				   r"//[^\n]*\n"]                   # //
@@ -26,6 +33,7 @@ html_comment_rx = [r"\<!\s*--(.*?)(--\s*\>)"]       # HTML comment
 comment_rx = js_comment_rx + html_comment_rx
 
 log = logging.getLogger("proxmon")
+vallog = logging.getLogger("pxmvalues")
 
 def cmsg(msg, *args, **kwargs):
 	logging.getLogger("proxmon").log(60, msg, *args, **kwargs)
@@ -79,13 +87,91 @@ def parse_sent_cookies(header):
 			return []
 	return cookielist
 
-def match_encoded_unfinished(v, targ):
-	for f in [md5.new, base64.b64encode, base64.b64decode]:
-		try: e = f(v)
-		except: pass
-		else:
-			if e in targ:
-				return True
+def hashformat(s):
+	if len(s) in hashlengths and not re.search(nonhexchars, s):
+		return True
+
+def md5sum(data):
+	m = md5.new(data)
+	return m.hexdigest()
+
+def sha1sum(data):
+	s = sha.new(data)
+	return s.hexdigest()
+
+# A series of base64 decodes to handle all of the weird variants commonly seen
+# stock: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/
+#        padding: =
+# variants sub +/ to !-. _-, ._, *! and pad with - or $ or have no padding
+# relevant RFC's: 989, 2152, 2440, 4648
+def b64d(s):
+	d = base64.b64decode(s)
+	e = base64.b64encode(d)
+	vallog.debug("  Trying b64d: %s -> %s" % (s, e))
+	if s == e: return d
+
+def b64d_url(s):
+	d = base64.b64decode(s, '-_')
+	e = base64.b64encode(d, '-_')
+	vallog.debug("  Trying b64d_url: %s -> %s" % (s, e))
+	if s == e: return d
+
+def b64d_regex(s):
+	d = base64.b64decode(s, '!-')
+	e = base64.b64encode(d, '!-')
+	vallog.debug("  Trying b64d_regex: %s -> %s" % (s, e))
+	if s == e: return d
+
+def b64d_xml1(s):
+	d = base64.b64decode(s, '_-')
+	e = base64.b64encode(d, '_-')
+	vallog.debug("  Trying b64d_xml1: %s -> %s" % (s, e))
+	if s == e: return d
+
+def b64d_xml2(s):
+	d = base64.b64decode(s, '._')
+	e = base64.b64encode(d, '._')
+	vallog.debug("  Trying b64d_xml2: %s -> %s" % (s, e))
+	if s == e: return d
+
+def b64d_misc1(s):
+	d = base64.b64decode(s, '*!')
+	e = base64.b64encode(d, '*!')
+	vallog.debug("  Trying b64d_misc1: %s -> %s" % (s, e))
+	if s == e: return d
+	if s[-1] == '=' and s[:-1] == e: return d
+	if s[-2] == '=' and s[:-2] == e: return d
+
+def b64normalize(s):
+	f = r"([A-Za-z\d+/!\-_.*]{2,})([=$]*)" # regex, no %, use on unquoted
+	if len(s) < 2:
+		vallog.debug("b64n_skip: Too short")
+		return
+	m = re.search(f, s)
+	if m: 
+		if not len(m.group()) == len(s):
+			vallog.debug(" b64n_skip: match != whole string %s" % s)
+			return
+
+		if len(m.group(2)) == 2:  # if there are two pad chars, they must match
+			if not m.group(2)[0] == m.group(2)[1]:
+				vallog.debug(" b64n_skip: two mismatched pad chars : %s" % s)
+				return
+
+		# get rid of short matches w/o pad since stuff like 'true' will decode
+		if len(m.group()) < 13 and (len(m.group(2)) < 1 or m.group()[-1] != '-'):
+			vallog.debug(" b64n_skip: short match w/ no pad (%s)", m.group())
+			return
+
+		vallog.debug(" key is b64 format (%s)" % s)
+		# have to handle '-' padding separately since it's valid in non-pad
+		if m.group(1)[-2] == '-':
+			return m.group(1)[:-2] + '=='
+		if m.group(1)[-1] == '-':
+			return m.group(1)[:-1] + '='
+		return m.group(1) + "=" * len(m.group(2))
+	vallog.debug(" b64n_skip: regex not matched (%s)" % s)
+
 
 def implied_dirs(p):
 	"""

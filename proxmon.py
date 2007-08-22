@@ -418,6 +418,10 @@ def main(prog, *args):
 	report_file.setLevel(30)
 	report_file.setFormatter(logging.Formatter("%(levelname)s %(message)s"))
 	log.addHandler(report_file)
+	# value log file
+	vallog = logging.getLogger("pxmvalues")
+	vallog.setLevel(logging.DEBUG)
+	vallog.addHandler(logging.FileHandler('values.pxm', 'wb+'))
 
 	cmsg('starting ProxMon v%s (%s)' % (__version__, 
 				'http://www.isecpartners.com'))
