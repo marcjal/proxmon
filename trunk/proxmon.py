@@ -483,6 +483,11 @@ def main(prog, *args):
 	if opts.verbosity > 1: log.info('main: verbosity: %d' % opts.verbosity)
 	log_con.setLevel(30 - (opts.verbosity * 10))
 
+	if len(oargs):
+		cmsg("Extra argument(s) %s\nPlease consult the help with %s -h" % (
+				' '.join(oargs), prog))
+		return
+
 	if opts.version:
 		cmsg("ProxMon version %s" % __version__)
 		return
