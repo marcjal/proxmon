@@ -16,7 +16,7 @@ class insecure_password_entry(check):
 				for n,v in i.attrs:
 					if n.lower() == 'type':
 						if v.lower() == 'password':
-							desc = "[*] Non-SSL password entry field on %s" % (
+							desc = "Non-SSL password entry field on %s" % (
 									t['url'])
 							id = t['id']
 							self.add_single(desc, id=id)

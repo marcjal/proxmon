@@ -10,6 +10,6 @@ class secure_cookie_sent_clear(check):
 			if s in trivial_values: continue
 			if s in pmd.ClearValues:
 				for x in pmd.ClearValues[s]:
-					desc = "[*] Secure cookie value sent clear: %s" % s
+					desc = "Secure cookie value sent clear: %s" % s
 					id = x['httpparams']['id']
 					self.add_single(desc, id=id)

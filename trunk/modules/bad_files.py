@@ -26,7 +26,7 @@ class bad_files(netcheck):
 						if bd in self.checked_dirs_by_host[t['server']]:
 							continue
 					if urltesting.file_contains(t['proto']+'://'+t['server']+bd, b['text']):
-						desc = '[*] Bad file found: %s on %s' % (bd, t['server'])
+						desc = 'Bad file found: %s on %s' % (bd, t['server'])
 						verbose = '%s found: %s' % (b['file'], b['desc'])
 						self.add_single(desc, verbose=verbose)
 					if t['server'] in self.checked_dirs_by_host:

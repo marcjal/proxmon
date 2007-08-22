@@ -5,11 +5,10 @@ from pmutil import *
 # CookieSummary stuff
 def summarize_cookie(cookie):
 	"Print a one line summary of what is in this cookie."
-	print "name: " + cookie["name"].ljust(16), "value: " + cookie["value"][:40],
-	if (len(cookie["value"]) > 40):
-		print "..."
-	else:
-		print
+	if (len(cookie["value"]) > 40): suffix = "..."
+	else: suffix = ""
+	cmsg("name: %s value: %s" % (
+			cookie["name"].ljust(16), cookie["value"][:40], suffix))
 
 def summarize_setcookie_param(name, cookies):
 	"Gives summary information for the parameter in the provided cookies"
@@ -74,26 +73,26 @@ class cookie_summary(postruncheck):
 		# XXX: unused - sentcookiesbyname = cookies_by_name(pmd.SentCookies)
 		# XXX: unused - sentcookienames = uniq_cookies(pmd.SentCookies)
 
-		print '-' * 40
-		print "Saw %d unique cookie names in %d conversations" % (len(cookienames), len(pmd.Transactions))
-		print "Saw %d Set-Cookie headers, %d cookies sent by browser" % (len(pmd.SetCookies), len(pmd.SentCookies))
+		cmsg('-' * 40)
+		cmsg("Saw %d unique cookie names in %d conversations" % (len(cookienames), len(pmd.Transactions)))
+		cmsg("Saw %d Set-Cookie headers, %d cookies sent by browser" % (len(pmd.SetCookies), len(pmd.SentCookies)))
 
-		print '-'*40
-		print "[*] Listing unique cookie names"
+		cmsg('-'*40)
+		cmsg("Listing unique cookie names")
 		for c in cookienames:
-			print c
+			cmsg(c)
 
-		print '-'*40
-		print '[*] Listing Set-Cookie properties'
+		cmsg('-'*40)
+		cmsg('Listing Set-Cookie properties')
 		for c in setcookienames:
-			print "Cookie: %s" % c
-			print summarize_setcookie_param('domain', setcookiesbyname[c])
-			print summarize_setcookie_param('path', setcookiesbyname[c])
-			print summarize_setcookie_flags(setcookiesbyname[c])
-			print '-' * 20
+			cmsg("Cookie: %s" % c)
+			cmsg(summarize_setcookie_param('domain', setcookiesbyname[c]))
+			cmsg(summarize_setcookie_param('path', setcookiesbyname[c]))
+			cmsg(summarize_setcookie_flags(setcookiesbyname[c]))
+			cmsg('-' * 20)
 
 		if(self.verbosity > 1):
-			print '-'*40
+			cmsg('-'*40)
 			# XXX - should this be done for sent cookies?
 			# XXX - don't report dupes
 			for c in pmd.SetCookies:

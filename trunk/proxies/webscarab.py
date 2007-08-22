@@ -1,12 +1,14 @@
 """
 Code to support the WebScarab proxy
 """
-import os, pdb, re, sys
+import os, pdb, re, sys, logging
 from os.path import join as opjoin
 from os.path import exists as opexists
 from pmutil import *
 from pmproxy import *
 from transaction import *
+
+log = logging.getLogger("proxmon")
 
 class webscarab(pmproxy):
 	"WebScarab proxy code"
@@ -173,10 +175,11 @@ class webscarab(pmproxy):
 
 		tmpdir = get_tmpdir()
 		if tmpdir == None:
-			print "[*] Couldn't get user temp dir, exiting"
+			log.error("Couldn't get user temp dir, exiting")
 			return None
 
-		if self.verbosity > 1: print '[d] get_latest_ws_tempdir: searching ' + tmpdir
+		if self.verbosity > 1: 
+			cmsg('[d] get_latest_ws_tempdir: searching %s' % tmpdir)
 
 		# Select most recently created directory
 		for root, dirs, files in os.walk(tmpdir):
@@ -192,18 +195,18 @@ class webscarab(pmproxy):
 	def list_ws_tempdirs(self):
 		tmpdir = get_tmpdir()
 		if tmpdir == None:
-			print "[*] Couldn't get user temp dir, exiting"
+			log.error("[*] Couldn't get user temp dir, exiting")
 			return
 
-		print "[*] Finding WebScarab temporary directories in \n%s" % tmpdir
+		cmsg("Finding WebScarab temporary directories in \n%s" % tmpdir)
 		wsdirs = {}
 		for root, dirs, files in os.walk(tmpdir):
 			for d in dirs:
 				if re.search("^webscarab", d):
 					wsdirs[opjoin(root, d)] = domains_in_dir(opjoin(root, d))
-					print "%s contains:\n\t%s" % (d, wsdirs[opjoin(root, d)])
+					cmsg("%s contains:\n\t%s" % (d, wsdirs[opjoin(root, d)]))
 
 		if len(wsdirs.keys()) == 0:
-			print "No WebScarab temporary directories found"
+			cmsg("No WebScarab temporary directories found")
 
 

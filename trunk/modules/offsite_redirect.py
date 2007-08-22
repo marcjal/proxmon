@@ -13,6 +13,7 @@ class offsite_redirect(check):
 				if not (299 < t['code'] < 400): continue
 				m = re.match(r"^http[s]*://([^:/]+)[:/].*", t['location'], re.I)
 				if m and t['host'] != m.group(1):
-					desc = '[*] Offsite redirect: %s to %s' % (t['url'], t['location'])
+					desc = 'Offsite redirect: %s to %s' % (
+							t['url'], t['location'])
 					self.add_single(desc, id=t['id'])
 		self.lasttransaction = end

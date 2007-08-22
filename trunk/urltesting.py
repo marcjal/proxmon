@@ -6,10 +6,12 @@
 Performs testing on urls to determine if they provide directory listings
 or allow uploading of data with HTTP PUT and assorted support functions
 """
-import urlparse, StringIO, os, sys, re, time, sha
+import urlparse, StringIO, os, sys, re, time, sha, logging
 import pycurl
 
 DEBUG = False
+
+log = logging.getLogger("proxmon")
 
 # internal - create a curl object, with an associated output string,
 # no interest in SSL certificate validity or following redirects and
@@ -73,7 +75,7 @@ that the administrator review the directory permissions."""
 		if b.getvalue() == filecontent: return True
 		else: return False
 	if (DEBUG):
-		print c.getinfo(c.HTTP_CODE), url
+		log.info(c.getinfo(c.HTTP_CODE), url)
 	return False
 
 # heuristically determines if the page resulting from accessing this

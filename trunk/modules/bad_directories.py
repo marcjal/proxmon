@@ -27,9 +27,9 @@ class bad_directories(netcheck):
 					if t['server'] in self.checked_dirs_by_host:
 						if bd in self.checked_dirs_by_host[t['server']]:
 							continue
-					#print "[d] Trying "+url
+					log.debug("Trying %s" % url)
 					if urltesting.url_exists(url):
-						desc = '[*] Bad directory found: %s on %s' % (bd, t['server'])
+						desc = 'Bad directory found: %s on %s' % (bd, t['server'])
 						self.add_single(desc)
 					if t['server'] in self.checked_dirs_by_host:
 						self.checked_dirs_by_host[t['server']].append(bd)

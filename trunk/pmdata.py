@@ -150,14 +150,15 @@ class pmdata(object):
 							upperc = len(re.findall(r'[A-Z]', normalizedkey))
 							lowerc = len(re.findall(r'[a-z]', normalizedkey))
 							if not (lowerc and upperc):
-								vallog.debug(" upper or lower is 0 - %s" % normalizedkey)
+								vallog.debug(" upper or lower is 0 - %s" 
+												% normalizedkey)
 								continue
 							r1 = float(upperc/lowerc)
 							r2 = float(lowerc/upperc)
 							vallog.debug(" upper/lower is %.03f, "
 										 "lower/upper is %.03f - %s" % (
 									r1, r2, normalizedkey))
-							if max(r1, r2) > 3:
+							if max(r1, r2) > 3: # 3:1 ratio u:l or l:u
 								vallog.debug(" bad ratio - %s" % normalizedkey)
 								continue
 							key = urllib.quote(dec)

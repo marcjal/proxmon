@@ -12,7 +12,7 @@ class ssl_val_sent_clear(check):
 				for cv in pmd.ClearValues[sv]:
 					fsv = pmd.SSLValues[sv][0]
 					if fsv['type'] == 'sentcookie': continue
-					desc = "[*] Value set over SSL sent clear: " \
+					desc = "Value set over SSL sent clear: " \
 						"value %s (set by %s in %s) seen as %s %s " \
 						"(sent to %s)" % (sv, fsv['httpparams']['server'], 
 						fsv['type'], cv['name'], cv['type'], 

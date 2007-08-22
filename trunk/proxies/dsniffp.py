@@ -1,8 +1,10 @@
-import glob, pdb, re, sys, time
+import glob, pdb, re, sys, time, logging
 if __name__ == '__main__': sys.path.append('..')
 from pmutil import *
 from pmproxy import *
 from transaction import *
+
+log = logging.getLogger("proxmon")
 
 try:
 	import dsniff
@@ -10,7 +12,7 @@ try:
 	import event
 	loaderror = False
 except ImportError:
-	print 'Error importing dsniff'
+	log.error('Error importing dsniff')
 	loaderror = True
 
 if not loaderror and sys.platform != 'cygwin':
@@ -22,7 +24,7 @@ if not loaderror and sys.platform != 'cygwin':
 
 	class pmdsniffh(dsniff.Handler):
 		def setup(self):
-			#print "pmdsniffh.setup"
+			#log.info("pmdsniffh.setup")
 			self.transactions = []
 			self.curid = 0
 			self.subscribe('service', 'http', self.recv_flow)
@@ -33,10 +35,10 @@ if not loaderror and sys.platform != 'cygwin':
 				f.server.save = saver(f)
 			elif f.state == dsniff.FLOW_CLIENT_DATA:
 				f.client.save.data += f.client.data
-				#print f.client.save.data
+				#log.info(f.client.save.data)
 			elif f.state == dsniff.FLOW_SERVER_DATA:
 				f.server.save.data += f.server.data
-				#print f.server.save.data
+				#log.info(f.server.save.data)
 
 				if chk_fmt(f.server.save.data) and chk_fmt(f.client.save.data):
 					t = {}
@@ -102,14 +104,14 @@ if not loaderror and sys.platform != 'cygwin':
 
 		def get_next(self, session):
 			event.loop(1) # EVLOOP_ONCE
-			#print 'pmdsniff.get_next: ' + str(self.handler.transactions)
+			#log.info('pmdsniff.get_next: ' + str(self.handler.transactions))
 			if self.handler and len(self.handler.transactions):
-				#print 'pmdsniff.get_next: transactions is %d long' % (
-				#			len(self.handler.transactions))
+				#log.info('pmdsniff.get_next: transactions is %d long' % (
+				#			len(self.handler.transactions)))
 				for t in self.handler.transactions:
 					if t['id'] not in session['seentids']:
 						if not (t['request'] or t['response']): continue
-						#print t
+						#log.debug(t)
 						session['seentids'].append(t['id'])
 						session['transactions'].append(t)
 						return t

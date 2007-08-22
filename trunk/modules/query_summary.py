@@ -1,13 +1,16 @@
 "Summarize query string information"
+import logging
 from pmcheck import *
 from pmutil import *
+
+log = logging.getLogger("proxmon")
 
 class query_summary(postruncheck):
 	"Summarize query string information"
 
 	def report(self, pmd):
 		# show parameter counts
-		print '-' * 40
+		cmsg('-' * 40)
 		qs_counts = {}
 		for q in pmd.QueryStrings:
 			if q['name'] not in qs_counts:
@@ -17,10 +20,10 @@ class query_summary(postruncheck):
 		keys = qs_counts.keys()
 		keys.sort()
 		for k in keys:
-			print "Parameter %s occurs %d times" % (k, qs_counts[k])
+			cmsg("Parameter %s occurs %d times" % (k, qs_counts[k]))
 
 		# Show a list of Paths and their query strings for each host
-		print '-' * 40
+		cmsg('-' * 40)
 		paths_by_host = {}
 		dirs_by_host = {}
 		params_by_url = {}
@@ -53,18 +56,13 @@ class query_summary(postruncheck):
 		hosts = paths_by_host.keys()
 		hosts.sort()
 		for h in hosts:
-			print 'Host: ' + h
-			print '  Directories:',
-			for d in dirs_by_host[h]:
-				print d,
-			print
+			cmsg('Host: ' + h)
+			cmsg('  Directories: %s' % ' '.join(dirs_by_host[h]))
 			for p in paths_by_host[h]:
 				if h+p in params_by_url:
-					print '  Path: %s %d query strings' % (p, len(params_by_url[h+p]))
+					cmsg('  Path: %s %d query strings' % (p, len(params_by_url[h+p])))
 					for q in params_by_url[h+p]:
-						print '    QS:' + q
+						cmsg('    QS: %s' % q)
 				else:
-					print '  Path: ' + p
-			print '-' * 20
-
-
+					cmsg('  Path: %s' % p)
+			cmsg('-' * 20)

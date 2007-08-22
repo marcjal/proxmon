@@ -22,7 +22,7 @@ class writable_dir(netcheck):
 					if d in self.checked_dirs_by_host[t['server']]:
 						continue
 				if urltesting.allows_upload(t['proto']+'://'+t['server']+d):
-					desc = '[*] Upload to %s on %s succeeded' % (d, t['server'])
+					desc = 'Upload to %s on %s succeeded' % (d, t['server'])
 					self.add_single(desc)
 				if t['server'] in self.checked_dirs_by_host:
 					self.checked_dirs_by_host[t['server']].append(d)

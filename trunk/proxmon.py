@@ -17,6 +17,8 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 # XXX - Beta version
+# XXX - Parallelize network stuff
+# XXX - Need to give feedback on online tests while they run
 # XXX - Online checks ignoring -f filter option
 #       - Need to trace this, filtered transactions shouldn't be added
 #         to pmd in the first place, so checks shouldn't ever find out
@@ -24,7 +26,7 @@
 #       - filter is looking at whole url, which contains redirects like
 #         http://foo.com/redir?http://bar.com
 # TODO before release:
-#  - b64 and hash stuff needs more testing
+#  - hash stuff needs more testing
 #  - dsniff needs testing
 #  - retest --extract, anything missing?
 #
@@ -65,7 +67,6 @@ try:
 except ImportError:
 	pass
 
-Verbosity = 0
 TIDs = None
 Count = 0
 ProxCJ = None
@@ -76,6 +77,8 @@ okfnchars = string.digits + string.ascii_letters + '._&%()!-[]+='
 for x in xrange(256):
 	if chr(x) not in okfnchars: FNTrans[x] = '_'
 FNTrans = ''.join(FNTrans)
+
+log = logging.getLogger("proxmon")
 
 def parsetrans(t, checks, pmd, urlfilter, hostfilter):
 	"""
@@ -123,7 +126,7 @@ def extract_trans(t):
 		os.makedirs(opjoin(pdir, t['dir'][1:]))
 	except OSError, e:
 		if e.errno != 17:
-			print 'Error: ' + e.strerror
+			log.error('Error: %s' % e.strerror)
 
 	fn = t['file'].rsplit('.', 1)
 	if len(fn[0]) > 30:
@@ -134,7 +137,7 @@ def extract_trans(t):
 		if len(fn[1]) > 10:
 			fn[1] = fn[1][:10]
 		outfn += '.' + fn[1].translate(FNTrans)
-	#print 'extract_trans: writing to '+ outfn
+	#log.info('extract_trans: writing to %s' % outfn)
 	f = open(outfn, 'wb')
 	f.write(t['respbody'])
 	f.close()
@@ -175,16 +178,16 @@ def tail(wproxy, session, checks, pmd, urlfilter, hostfilter):
 	"""
 	global Count
 
-	print '[*] Monitoring %s' % session['id']
-	print '[*] Parsing existing conversations ...'
+	cmsg('Monitoring %s' % session['id'])
+	cmsg('Parsing existing conversations ...')
 	scan(wproxy, session, checks, pmd, urlfilter, hostfilter)
-	print '[*] Parsed %d existing conversations' % Count
+	cmsg('Parsed %d existing conversations' % Count)
 
 	if not session['active']:
-		print '[*] Session is not active, no point in monitoring'
+		cmsg('Session is not active, no point in monitoring')
 		return
 
-	print '[*] Entering monitor mode ...'
+	cmsg('Entering monitor mode ...')
 	while(True):
 		didsomething = False
 		rawt = wproxy.get_next(session)
@@ -222,25 +225,24 @@ def load_proxies(interface):
 		if m == '__init__': continue
 		mod = __import__(m)
 		if mod.loaderror:
-			print "[x] Needed module not found, disabling %s" % mod.__file__
+			log.warn("Needed module not found, disabling %s" % mod.__file__)
 
 	proxylist = []
 	proxylist.extend(pmproxy.__subclasses__())
 
 	proxies = {}
-	print '[*] Loading support for:',
+	cmsg('Loading support for:',)
 	for p in proxylist:
 		if p not in [pmproxy]:
-			print p.proxy_name,
+			cmsg("  " + p.proxy_name)
 			try:
 				if p.proxy_name == 'dsniffp':
-					print "(interface %s)" % interface,
+					cmsg("    (interface %s)" % interface)
 					proxies[p.__module__] = p(interface)
 				else:
 					proxies[p.__module__] = p()
 			except:
-				print "\n[x] Error loading, (if dsniffp, check interface name)",
-	print
+				log.error("\tError loading, (if dsniffp, check interface name)")
 
 	return proxies
 
@@ -271,7 +273,7 @@ def load_checks(loadreg, loadnet, loadpostrun, exclude=[]):
 		if m in exclude: continue
 		mod = __import__(m)
 		if mod.loaderror:
-			print "[x] Needed module not found, not loading %s" % mod.__file__
+			log.warn("Needed module not found, not loading %s" % mod.__file__)
 
 	checklist = []
 	if loadreg: checklist.extend(check.__subclasses__())
@@ -289,7 +291,7 @@ def load_checks(loadreg, loadnet, loadpostrun, exclude=[]):
 				if not issubclass(c, netcheck):
 					loadit = False
 			if loadit:
-				print ' - ' + c.__doc__
+				cmsg(' - %s' % c.__doc__)
 				checks.append(c())
 
 	return checks
@@ -391,15 +393,39 @@ class proxy_cookiejar(object):
 		self._cj.save(ignore_discard=True, ignore_expires=True)
 
 def main(prog, *args):
-	global ProxCJ, Verbosity, TIDs, Count, Extract
+	global log, ProxCJ, TIDs, Count, Extract
 
-	print '[*] starting ProxMon v%s (%s)' % (__version__, 
-				'http://www.isecpartners.com')
-	print '[*] Copyright (C) 2007, Jonathan Wilkins, iSEC Partners Inc.'
-	print '[*] Proxmon comes with ABSOLUTELY NO WARRANTY;'
-	print '[*] This is free software, and you are welcome to redistribute it'
-	print '[*] under certain conditions; see accompanying file LICENSE for '
-	print '[*] details on warranty and redistribution details.'
+	# Python standard logging
+	log.setLevel(logging.DEBUG)
+	logging.addLevelName(60, "[*]")
+	logging.addLevelName(50, "[c]")
+	logging.addLevelName(40, "[e]")
+	logging.addLevelName(30, "[w]")
+	logging.addLevelName(20, "[i]")
+	logging.addLevelName(10, "[d]")
+	# console
+	log_con = logging.StreamHandler()
+	log_con.setFormatter(logging.Formatter("%(levelname)s %(message)s"))
+	log.addHandler(log_con)
+	# debug file 
+	log_file = logging.FileHandler('log.pxm', 'wb+')
+	log_file.setLevel(logging.DEBUG)
+	log_file.setFormatter(logging.Formatter(
+			"%(filename)s:%(funcName)s:%(lineno)s %(levelname)s %(message)s"))
+	log.addHandler(log_file)
+	# report file
+	report_file = logging.FileHandler('report.pxm', 'wb+')
+	report_file.setLevel(30)
+	report_file.setFormatter(logging.Formatter("%(levelname)s %(message)s"))
+	log.addHandler(report_file)
+
+	cmsg('starting ProxMon v%s (%s)' % (__version__, 
+				'http://www.isecpartners.com'))
+	cmsg('Copyright (C) 2007, Jonathan Wilkins, iSEC Partners Inc.')
+	cmsg('Proxmon comes with ABSOLUTELY NO WARRANTY;')
+	cmsg('This is free software, and you are welcome to redistribute it')
+	cmsg('under certain conditions; see accompanying file LICENSE for ')
+	cmsg('details on warranty and redistribution details.')
 
 	optp = OptionParser(usage="%prog [options]")
 	optp.add_option('-1', '--once', action='store_true', dest='runonce', 
@@ -450,28 +476,11 @@ def main(prog, *args):
 			help='Extract files to the specified directory')
 	(opts, oargs) = optp.parse_args()
 
-	Verbosity = opts.verbosity
-	if Verbosity > 1: print '[d] main: verbosity: '+str(Verbosity)
-	# Python standard logging
-	log = logging.getLogger("proxmon")
-	log.setLevel(logging.DEBUG)
-	logformat = logging.Formatter("[d] %(message)s")
-	# console
-	log_con = logging.StreamHandler()
-	log_con.setLevel(40 - (Verbosity * 10))
-	log_con.setFormatter(logformat)
-	log.addHandler(log_con)
-	# file
-	log_file = logging.FileHandler('log.pxm', 'wb+')
-	log_file.setLevel(logging.DEBUG)
-	log_file.setFormatter(logformat)
-	log.addHandler(log_file)
-
-	# increase recursion depth for hash stuff in pmdata
-	sys.setrecursionlimit(2500)
+	if opts.verbosity > 1: log.info('main: verbosity: %d' % opts.verbosity)
+	log_con.setLevel(30 - (opts.verbosity * 10))
 
 	if opts.version:
-		print "ProxMon version %s" % __version__
+		cmsg("ProxMon version %s" % __version__)
 		return
 
 	if opts.extract:
@@ -479,7 +488,7 @@ def main(prog, *args):
 
 	# Check imported package versions
 	if BeautifulSoup.__version__ < '3.0.3':
-		print '[x] Old version of BeautifulSoup found, good luck ..'
+		log.warn('BeautifulSoup < 3.0.3, good luck ..')
 
 	proxies = load_proxies(opts.interface)
 	ProxCJ = proxy_cookiejar()
@@ -487,28 +496,28 @@ def main(prog, *args):
 	try:
 		wp = proxies[opts.which]
 	except KeyError:
-		print '[x] %s not yet supported' % opts.which
+		log.error('%s not yet supported' % opts.which)
 		return
 
 	if opts.list:
-		print '[*] Listing known sessions:'
+		cmsg('Listing known sessions:')
 		for s in wp.sessions(opts.datasource):
 			if s['nickname']:
 				name = s['nickname']
 			else:
 				name = s['id']
-			print '\nSession %s contains:' % name
+			cmsg('\nSession %s contains:' % name)
 			for d in s['domains']:
 				count = 0
 				if 'transactions' in s:
 					for t in s['transactions']:
 						if t['domain'] == d:
 							count +=1 
-				print '\t%s (%d)' % (d, count)
+				cmsg('\t%s (%d)' % (d, count))
 		return
 
 	# autodetects all decendants of check class in modules subdirectory
-	print "[*] Loading Checks ... "
+	cmsg("Loading Checks ... ")
 	excludes = []
 	if not opts.cookies: excludes.append('cookie_summary')
 	if not opts.qs: excludes.append('query_summary')
@@ -516,7 +525,7 @@ def main(prog, *args):
 		checks = load_checks(False, True, False, excludes)
 	else:
 		checks = load_checks(True, opts.online, True, excludes)
-	print '[*] %d checks loaded' % len(checks)
+	cmsg('%d checks loaded' % len(checks))
 
 	# Most netcheck modules just use these environment settings
 	if opts.proxy:
@@ -532,7 +541,7 @@ def main(prog, *args):
 	if opts.session:
 		opts.session = wp.session_info(opts.datasource, opts.session)
 	else:
-		print '[*] Finding available sessions ...'
+		cmsg('Finding available sessions ...')
 		session = None
 		latest = 0
 		sessions = wp.sessions(opts.datasource)
@@ -545,18 +554,18 @@ def main(prog, *args):
 
 	# if we still don't have a session defined, quit
 	if not opts.session:
-		print '[*] No sessions found, exiting ...'
+		cmsg('No sessions found, exiting ...')
 		return
 
 	if opts.tid:
 		TIDs = opts.tid
 		TIDs.sort()
-		print '[*] Only processing TIDs: ' + ', '.join(str(t) for t in TIDs)
+		cmsg('Only processing TIDs: ' + ', '.join(str(t) for t in TIDs))
 
 	if opts.all:
 		try:
 			sl = wp.sessions(opts.datasource)
-			print '[*] Running on all available sessions (%d total)' % len(sl)
+			cmsg('Running on all available sessions (%d total)' % len(sl))
 			sc = tt = 0
 			for s in sl:
 				Count = 0
@@ -564,21 +573,21 @@ def main(prog, *args):
 				pmd = pmdata()
 				for c in checks:
 					c.clear()
-				print '\n[*] Processing %s' % s['nickname']
-				print '\t(%s)' % s['id']
+				cmsg('\nProcessing %s' % s['nickname'])
+				cmsg('\t(%s)' % s['id'])
 				if not len(s['transactions']):
-					print "[*] 0 transactions to process"
+					cmsg("0 transactions to process")
 					continue
-				print '\tWith transactions from: ' + ', '.join(s['domains'])
+				cmsg('\tWith transactions from: ' + ', '.join(s['domains']))
 				scan(wp, s, checks, pmd, opts.urlfilter, opts.hostfilter)
-				print '[*] %d transactions processed' % Count
+				cmsg('%d transactions processed' % Count)
 				tt += Count
 				for c in checks:
 					c.report(pmd)
-				print
+				cmsg("")
 		except KeyboardInterrupt:
-			print "[*] Stopping at user's request, %d transactions parsed" % tt
-		print "[*] %d transactions in %d sessions processed" % (tt, sc)
+			cmsg("Stopping at user's request, %d transactions parsed" % tt)
+		cmsg("%d transactions in %d sessions processed" % (tt, sc))
 		return
 
 	try:
@@ -587,20 +596,20 @@ def main(prog, *args):
 			pmd.b64opts(opts.base64, opts.base64confirm)
 
 		if opts.datasource:
-			print '[*] Processing session %s in %s' % (opts.session['id'], 
-														opts.datasource)
+			cmsg('Processing session %s in %s' % (opts.session['id'], 
+														opts.datasource))
 		else:
-			print '[*] Processing session %s' % opts.session['id']
+			cmsg('Processing session %s' % opts.session['id'])
 
 		if opts.runonce:
-			print "[*] Running one time"
+			cmsg("Running one time")
 			scan(wp, opts.session, checks, pmd, opts.urlfilter, opts.hostfilter)
-			print '[*] Parsed %d transactions' % (Count)
+			cmsg('Parsed %d transactions' % (Count))
 		else:
-			print "[*] Running in monitor mode"
+			cmsg("Running in monitor mode")
 			tail(wp, opts.session, checks, pmd, opts.urlfilter, opts.hostfilter)
 	except KeyboardInterrupt:
-		print "[*] Stopping at user's request, %d transactions parsed" % Count
+		cmsg("Stopping at user's request, %d transactions parsed" % Count)
 
 	# Post run stuff
 	for c in checks:
