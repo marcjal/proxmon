@@ -161,8 +161,10 @@ def scan(wproxy, session, checks, pmd, urlfilter, hostfilter):
 			Count += 1
 
 	for c in checks:
+		start = time.time()
 		log.debug("scan: running check %s" % c.__doc__)
 		c.run(pmd)
+		log.debug("scan: check took %f seconds to run" % (time.time() - start))
 		c.show_all()
 
 def tail(wproxy, session, checks, pmd, urlfilter, hostfilter):
