@@ -202,7 +202,7 @@ def tail(wproxy, session, checks, pmd, urlfilter, hostfilter):
 
 		if didsomething:
 			for c in checks:
-				log.debug('tail: running check ' % c.__doc__)
+				log.debug('tail: running check %s' % c.__doc__)
 				c.run(pmd)
 				c.show_new()
 
