@@ -1,3 +1,20 @@
+Version 1.0.19 (200709??): XXX - correct date
+	- Renamed SecureValues to SSLValues to avoid confusion w/ Cookie Secure Flag
+	- Added modules
+		- Password Field served over HTTP (insecure_password_entry)
+		- Backup Versions of Files (backup_files)
+			- Demo of threading, takes 8 seconds instead of 21
+		- Value Summary (value_summary) which also flags interesting value names 
+		  such as "password"
+	- Moved to native python logging and added debug log and report file
+	- Cleaned up filters
+		- -f now specifies a hostname filter
+		- added -u which contains a URL filter
+	- Added Base64 decoding
+		- If a value is base64 encoded, only the decoded version will be stored
+	- Added Hash evaluation
+		- If a value is seen both clear and hashed, all hashed versions will be
+		  associated with the clear version
 Version 1.0.18 (20070329):
 	- Added -x which allows extraction of transaction responses (mainly for auditing
 	  JavaScript code, but since it strips gzip/deflate encoding it's useful in

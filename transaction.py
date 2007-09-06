@@ -90,6 +90,8 @@ def get_hostname(s):
 	@param s: String containing an URL"""
 	si = s.find("//") + 2
 	ei = s[si:].find(":")
+	if ei == -1:
+		ei = s[si:].find("/")
 	if si == -1 or ei == -1:
 		return None
 	return s[si:ei+si]
